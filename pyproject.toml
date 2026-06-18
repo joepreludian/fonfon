@@ -35,3 +35,6 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "integration: end-to-end test that boots a real VM; deselected by default (enable with --run-integration)",
+]

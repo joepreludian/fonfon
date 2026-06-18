@@ -8,8 +8,11 @@
 DIST := dist
 NAME := fonfon
 
+# Architecture for the integration VM: aarch64 (default) or x86_64.
+ARCH ?= aarch64
+
 .DEFAULT_GOAL := build
-.PHONY: build clean
+.PHONY: build clean test test-integration
 
 build: ## Build self-contained linux + macOS (x86_64 and aarch64) executables into dist/
 	@mkdir -p $(DIST)
@@ -23,3 +26,9 @@ build: ## Build self-contained linux + macOS (x86_64 and aarch64) executables in
 
 clean: ## Remove the dist/ directory
 	rm -rf $(DIST)
+
+test: ## Run the fast unit test suite (no VM)
+	uv run pytest
+
+test-integration: ## Boot a Debian VM and run the integration suite (ARCH=aarch64|x86_64)
+	ARCH=$(ARCH) bash tests/integration/run.sh

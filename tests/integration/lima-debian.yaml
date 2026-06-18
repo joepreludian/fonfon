@@ -1,0 +1,32 @@
+# Lima template for fonfon's integration-test VM.
+#
+# A throwaway Debian 12 (bookworm) cloud VM that run.sh boots, injects the
+# fonfon scie into, asserts against, and deletes. One VM per run.
+#
+# Distro pin: change the two image URLs below to swap the whole harness to a
+# different Debian point release or distro. The `latest` directory tracks the
+# newest bookworm cloud build (security updates included).
+#
+# Reproducibility note: these hand-written entries are intentionally NOT
+# digest-pinned, so they keep working as Debian republishes `latest`. Lima
+# prints a "digest is not specified" warning and proceeds. To get per-arch,
+# digest-pinned URLs instead, regenerate this file from Lima's official
+# template (it ships verified digests):
+#
+#     limactl start --name fonfon-test template://debian-12   # then copy its YAML
+#
+# Debian cloud images use `amd64`/`arm64`; Lima's `arch` field uses
+# `x86_64`/`aarch64`. run.sh selects the arch with `limactl start --arch`.
+images:
+  - location: "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
+    arch: "x86_64"
+  - location: "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-arm64.qcow2"
+    arch: "aarch64"
+
+# Modest resources: enough to run a CLI smoke test, cheap to boot/emulate.
+cpus: 2
+memory: "2GiB"
+disk: "10GiB"
+
+# The scie is copied in with `limactl copy`, so no host mounts are needed.
+mounts: []
