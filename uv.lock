@@ -135,6 +135,7 @@ dependencies = [
 dev = [
     { name = "mkdocs" },
     { name = "mkdocs-material" },
+    { name = "pex" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "ruff" },
@@ -150,6 +151,7 @@ requires-dist = [
 dev = [
     { name = "mkdocs", specifier = ">=1.6.1" },
     { name = "mkdocs-material", specifier = ">=9.6.0" },
+    { name = "pex", specifier = ">=2.20.0" },
     { name = "pre-commit", specifier = ">=4.3.0" },
     { name = "pytest", specifier = ">=9.1.0" },
     { name = "ruff", specifier = ">=0.14.0" },
@@ -378,6 +380,16 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/5a/82/42f767fc1c1143d6fd36efb827202a2d997a375e160a71eb2888a925aac1/pathspec-1.1.1.tar.gz", hash = "sha256:17db5ecd524104a120e173814c90367a96a98d07c45b2e10c2f3919fff91bf5a", size = 135180, upload-time = "2026-04-27T01:46:08.907Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f1/d9/7fb5aa316bc299258e68c73ba3bddbc499654a07f151cba08f6153988714/pathspec-1.1.1-py3-none-any.whl", hash = "sha256:a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189", size = 57328, upload-time = "2026-04-27T01:46:07.06Z" },
+]
+
+[[package]]
+name = "pex"
+version = "2.96.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/1c/a0/f3f0728f246645b07eebc4020585b0a1708b7dd191a9841dec151b823fd9/pex-2.96.0.tar.gz", hash = "sha256:2aa41145628626a85151fdfba418d5e150e4f11316769c19da87563a64c739c7", size = 5291075, upload-time = "2026-06-01T15:05:57.715Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/12/05/1c74e9b16522b3ef48a99cd50c2f530a3d64216d6a36e1dbc44ffc56f6a5/pex-2.96.0-py2.py35.py36.py37.py38.py39.py310.py311-none-any.whl", hash = "sha256:9b0a3d433fccc9455928c3ca991f1efb8e9ca56f948746901c79de938781575a", size = 3986406, upload-time = "2026-06-01T15:05:53.731Z" },
+    { url = "https://files.pythonhosted.org/packages/e5/a6/d6f73fa09b43b44460144ec8d55f0554880122fe3e1b0a90c6bf4c1ab532/pex-2.96.0-py3.py312-none-any.whl", hash = "sha256:84f70005efa4631063fda1d01bf79e72e38d12af1da59a679c8c4dbb6036d345", size = 1804007, upload-time = "2026-06-01T15:05:55.863Z" },
 ]
 
 [[package]]
