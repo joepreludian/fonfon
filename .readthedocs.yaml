@@ -1,14 +1,19 @@
 # Read the Docs configuration file
-# See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
+# See https://docs.readthedocs.com/platform/stable/config-file/v2.html for details
 
 # Required
 version: 2
 
-# Set the OS, Python version, and other tools you might need
 build:
   os: ubuntu-24.04
   tools:
+    # This Python only bootstraps uv. uv then provisions the project's
+    # required interpreter (requires-python >= 3.14) and installs the dev
+    # dependency group, which provides mkdocs-material.
     python: "3.13"
-
-mkdocs:
-  configuration: docs/manual/mkdocs.yml
+  # build.commands takes full control of the build, so the top-level
+  # `mkdocs:` key is intentionally omitted here.
+  commands:
+    - pip install uv
+    - uv sync --frozen
+    - uv run mkdocs build --strict -f docs/manual/mkdocs.yml --site-dir $READTHEDOCS_OUTPUT/html
