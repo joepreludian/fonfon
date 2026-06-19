@@ -35,6 +35,8 @@ theme:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - Commands:
+      - check: commands/check.md
 
 markdown_extensions:
   - admonition

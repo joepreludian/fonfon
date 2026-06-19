@@ -7,6 +7,25 @@ It setups a base system in a Linux environment to be ready to serve applications
 
 Fonfon is a python-cli application, self-contained in a `pex` executable for quick run into a server, without dependencies. It uses `click` and `rich` as the main libraries. Also will be responsible for managing server issuing commands and so on.
 
+### Layered design
+
+Commands flow through four layers:
+
+1. **Input** — `cli.py` (click): parses args, picks an output format.
+2. **Domain services** — `services/*_service.py`: fluent, reusable probes for one
+   area each (`OSService`, `PackageService`, `SystemdService`, `NetworkService`,
+   `DockerService`). They return plain-fact DTOs and contain no policy.
+3. **Use-case** — e.g. `services/check.py::run_check`: composes services and
+   applies status policy, producing a `CheckReport` (`models.py`).
+4. **Output** — `output/console.py` and `output/json.py`: render `CheckReport`.
+
+All OS interaction lives in `system/` boundary adapters (`Systemctl`, `Dpkg`,
+`DockerCli`, `probes`), injected into services so everything is unit-testable
+without a real server. Package detection uses a Strategy keyed on distro
+(`services/package_backends.py`); only Debian/dpkg ships today.
+
+Runtime deps: click, rich, pydantic.
+
 ## Conventions
 
 - In doubt Prefer clarity to cleverness.
