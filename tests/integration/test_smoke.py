@@ -40,3 +40,29 @@ def test_check_runs_on_real_debian(vm_run):
         f"expected JSON with 'sections' key in stdout, got: {result.stdout!r}\n"
         f"stderr: {result.stderr}"
     )
+
+
+@pytest.mark.integration
+def test_setup_runs_on_real_debian(vm_run):
+    """`fonfon setup --output json` provisions the server and reports steps.
+
+    First run: each step should be installed (or skipped if already present).
+    Second run (idempotency): every step must be reported as skipped because
+    the system is already fully provisioned.
+    """
+    result = vm_run(f"sudo {vm_run.scie} setup ituser --output json")
+    assert '"steps"' in result.stdout, (
+        f"expected JSON with 'steps' key in stdout, got: {result.stdout!r}\n"
+        f"stderr: {result.stderr}"
+    )
+
+    # Idempotency: a second run must report every step as skipped.
+    result2 = vm_run(f"sudo {vm_run.scie} setup ituser --output json")
+    assert '"steps"' in result2.stdout, (
+        f"expected JSON with 'steps' key on second run, got: {result2.stdout!r}\n"
+        f"stderr: {result2.stderr}"
+    )
+    assert '"skipped"' in result2.stdout, (
+        f"expected all steps to be 'skipped' on second run, got: {result2.stdout!r}\n"
+        f"stderr: {result2.stderr}"
+    )
