@@ -33,6 +33,7 @@ def _base(**over):
             interfaces={"eth0": "203.0.113.5"}, public_ip="203.0.113.5"
         ),
         docker=DockerReport(docker_installed=False),
+        sdci_installed=False,
     )
     args.update(over)
     return build_report(**args)
@@ -79,10 +80,10 @@ def test_docker_gaps_are_warn():
     assert all(i.status is CheckStatus.WARN for i in dock.values())
 
 
-def test_unsupported_distro_packages_section_is_skip():
+def test_unsupported_distro_packages_section_has_skip_row():
     report = _base(packages=None)
     pkgs = _items(report, "Packages")
-    assert all(i.status is CheckStatus.SKIP for i in pkgs.values())
+    assert pkgs["packages"].status is CheckStatus.SKIP
 
 
 def test_report_ok_false_when_fail_present():
@@ -119,3 +120,23 @@ def test_docker_all_ok_path():
     )
     items = _items(_base(docker=docker), "Docker")
     assert all(i.status is CheckStatus.OK for i in items.values())
+
+
+def test_sdci_installed_is_ok():
+    pkgs = _items(_base(sdci_installed=True), "Packages")
+    assert pkgs["sdci"].status is CheckStatus.OK
+    assert pkgs["sdci"].detail == "installed (pipx)"
+
+
+def test_sdci_not_installed_is_fail():
+    pkgs = _items(_base(sdci_installed=False), "Packages")
+    assert pkgs["sdci"].status is CheckStatus.FAIL
+    assert pkgs["sdci"].detail == "not installed"
+
+
+def test_unsupported_distro_still_includes_sdci_item():
+    report = _base(packages=None, sdci_installed=True)
+    pkgs = _items(report, "Packages")
+    # dpkg SKIP row is present alongside the sdci OK row
+    assert pkgs["packages"].status is CheckStatus.SKIP
+    assert pkgs["sdci"].status is CheckStatus.OK

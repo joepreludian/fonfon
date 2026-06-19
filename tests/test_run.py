@@ -15,3 +15,10 @@ def test_run_timeout_returns_nonzero_without_raising():
     proc = run(["sleep", "5"], timeout=0.05)
     assert proc.returncode != 0
     assert proc.stdout == ""
+
+
+def test_run_passes_env_to_subprocess():
+    # echo $FONFON_X via env; the child sees the merged env
+    proc = run(["sh", "-c", 'printf %s "$FONFON_X"'], env={"FONFON_X": "abc"})
+    assert proc.returncode == 0
+    assert proc.stdout == "abc"

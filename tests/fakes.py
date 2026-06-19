@@ -4,7 +4,7 @@ from subprocess import CompletedProcess
 def fake_runner(responses: dict[tuple[str, ...], CompletedProcess]):
     """Return a runner that maps an argv tuple to a canned CompletedProcess."""
 
-    def _run(args, timeout=10):
+    def _run(args, timeout=10, env=None):
         return responses[tuple(args)]
 
     return _run

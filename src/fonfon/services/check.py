@@ -10,6 +10,7 @@ from fonfon.services.package_backends import (
 )
 from fonfon.services.package_service import PackageReport, PackageService
 from fonfon.services.systemd_service import ServicesReport, SystemdService
+from fonfon.system.pipx import Pipx
 
 PACKAGES = ["sudo", "docker-ce", "tailscale", "python3-pipx"]
 SERVICES = ["docker", "ssh", "tailscaled"]
@@ -32,7 +33,10 @@ def run_check() -> CheckReport:
         )
     except UnsupportedDistroError:
         packages = None
-    return build_report(os_info, packages, services, network, docker)
+    sdci_installed = Pipx().is_installed("sdci")
+    return build_report(
+        os_info, packages, services, network, docker, sdci_installed=sdci_installed
+    )
 
 
 def build_report(
@@ -41,11 +45,13 @@ def build_report(
     services: ServicesReport,
     network: NetworkInfo,
     docker: DockerReport,
+    *,
+    sdci_installed: bool = False,
 ) -> CheckReport:
     return CheckReport(
         sections=[
             _system_section(os_info),
-            _packages_section(os_info, packages),
+            _packages_section(os_info, packages, sdci_installed),
             _services_section(services),
             _network_section(network),
             _docker_section(docker),
@@ -73,28 +79,37 @@ def _system_section(os_info: OSInfo) -> CheckSection:
     )
 
 
-def _packages_section(os_info: OSInfo, packages: PackageReport | None) -> CheckSection:
+def _packages_section(
+    os_info: OSInfo, packages: PackageReport | None, sdci_installed: bool
+) -> CheckSection:
     if packages is None:
-        return CheckSection(
-            title="Packages",
-            items=[
-                CheckItem(
-                    key="package.unsupported",
-                    label="packages",
-                    status=CheckStatus.SKIP,
-                    detail=f"package checks unsupported on {os_info.distro_id}",
-                )
-            ],
-        )
-    items = [
+        items: list[CheckItem] = [
+            CheckItem(
+                key="package.unsupported",
+                label="packages",
+                status=CheckStatus.SKIP,
+                detail=f"package checks unsupported on {os_info.distro_id}",
+            )
+        ]
+    else:
+        items = [
+            CheckItem(
+                key=f"package.{p.name}",
+                label=p.name,
+                status=CheckStatus.OK if p.installed else CheckStatus.FAIL,
+                detail=p.version if p.installed else "not installed",
+            )
+            for p in packages.packages
+        ]
+    # sdci is installed via pipx, which is distro-agnostic — always include it
+    items.append(
         CheckItem(
-            key=f"package.{p.name}",
-            label=p.name,
-            status=CheckStatus.OK if p.installed else CheckStatus.FAIL,
-            detail=p.version if p.installed else "not installed",
+            key="package.sdci",
+            label="sdci",
+            status=CheckStatus.OK if sdci_installed else CheckStatus.FAIL,
+            detail="installed (pipx)" if sdci_installed else "not installed",
         )
-        for p in packages.packages
-    ]
+    )
     return CheckSection(title="Packages", items=items)
 
 
