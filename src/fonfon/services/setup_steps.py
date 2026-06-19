@@ -10,6 +10,9 @@ from fonfon.system.dpkg import Dpkg
 from fonfon.system.pipx import Pipx
 from fonfon.system.users import Users
 
+SDCI_PACKAGE = "sdci"
+SDCI_EXECUTABLE = "sdci-server"
+
 DOCKER_PACKAGES = [
     "docker-ce",
     "docker-ce-cli",
@@ -160,7 +163,7 @@ class SdciStep(SetupStep):
         self._pipx = pipx or Pipx()
 
     def is_satisfied(self) -> bool:
-        return self._pipx.is_installed("sdci")
+        return self._pipx.has_executable(SDCI_EXECUTABLE)
 
     def apply(self) -> None:
-        self._pipx.install_global("sdci")
+        self._pipx.install_global(SDCI_PACKAGE)

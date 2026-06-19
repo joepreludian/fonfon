@@ -2,22 +2,19 @@ from fonfon.system.pipx import Pipx
 from tests.fakes import completed
 
 
-def test_is_installed_true_when_listed():
-    out = "sdci 1.2.3\nsomething 0.1\n"
-    pipx = Pipx(run=lambda args, timeout=10, env=None: completed(args, 0, out))
-    assert pipx.is_installed("sdci") is True
+def test_has_executable_true_when_found():
+    pipx = Pipx(run=lambda args, timeout=10, env=None: completed(args, 0, "found\n"))
+    assert pipx.has_executable("sdci-server") is True
 
 
-def test_is_installed_false_when_absent():
-    pipx = Pipx(
-        run=lambda args, timeout=10, env=None: completed(args, 0, "other 1.0\n")
-    )
-    assert pipx.is_installed("sdci") is False
+def test_has_executable_false_when_not_found():
+    pipx = Pipx(run=lambda args, timeout=10, env=None: completed(args, 1, "", ""))
+    assert pipx.has_executable("sdci-server") is False
 
 
-def test_is_installed_false_when_pipx_missing():
+def test_has_executable_false_when_which_missing():
     pipx = Pipx(run=lambda args, timeout=10, env=None: completed(args, 127, "", ""))
-    assert pipx.is_installed("sdci") is False
+    assert pipx.has_executable("sdci-server") is False
 
 
 def test_install_global_invokes_pipx_with_global_env():

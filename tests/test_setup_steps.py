@@ -72,8 +72,8 @@ class FakePipx:
         self._installed = set(installed)
         self.calls = []
 
-    def is_installed(self, package):
-        return package in self._installed
+    def has_executable(self, executable):
+        return executable in self._installed
 
     def install_global(self, package):
         self.calls.append(("install_global", package))
@@ -264,7 +264,7 @@ def test_pipx_step_apply_updates_before_install():
 
 
 def test_sdci_step_satisfied_when_sdci_installed():
-    pipx = FakePipx(installed=["sdci"])
+    pipx = FakePipx(installed=["sdci-server"])
     assert SdciStep(pipx=pipx).is_satisfied() is True
 
 

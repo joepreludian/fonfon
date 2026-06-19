@@ -14,15 +14,8 @@ class Pipx:
     def __init__(self, run: Callable = _default_run):
         self._run = run
 
-    def is_installed(self, package: str) -> bool:
-        proc = self._run(["pipx", "list", "--short"], env=_GLOBAL_ENV)
-        if proc.returncode != 0:
-            return False
-        return any(
-            line.split()[:1] == [package]
-            for line in proc.stdout.splitlines()
-            if line.strip()
-        )
+    def has_executable(self, executable: str) -> bool:
+        return self._run(["which", executable]).returncode == 0
 
     def install_global(self, package: str) -> None:
         proc = self._run(

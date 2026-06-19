@@ -33,7 +33,7 @@ def run_check() -> CheckReport:
         )
     except UnsupportedDistroError:
         packages = None
-    sdci_installed = Pipx().is_installed("sdci")
+    sdci_installed = Pipx().has_executable("sdci-server")
     return build_report(
         os_info, packages, services, network, docker, sdci_installed=sdci_installed
     )
@@ -107,7 +107,7 @@ def _packages_section(
             key="package.sdci",
             label="sdci",
             status=CheckStatus.OK if sdci_installed else CheckStatus.FAIL,
-            detail="installed (pipx)" if sdci_installed else "not installed",
+            detail="installed (sdci-server)" if sdci_installed else "not installed",
         )
     )
     return CheckSection(title="Packages", items=items)

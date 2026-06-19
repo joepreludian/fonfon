@@ -28,7 +28,7 @@ sudo fonfon setup <new_user> --output json    # machine-readable JSON
 | 3 | **Docker group** | Adds `<new_user>` to the `docker` group so containers can be managed without `sudo` |
 | 4 | **Tailscale** | Runs the official `curl \| sh` install script from `tailscale.com` |
 | 5 | **pipx** | Installs `pipx` via apt |
-| 6 | **sdci** | Installs `sdci` globally via pipx (`PIPX_HOME=/opt/pipx`, `PIPX_BIN_DIR=/usr/local/bin`) so it is available system-wide |
+| 6 | **sdci** | Installs the `sdci` pipx package globally (`PIPX_HOME=/opt/pipx`, `PIPX_BIN_DIR=/usr/local/bin`), which provides the `sdci-server` executable |
 
 ## Idempotency and error handling
 
@@ -62,9 +62,10 @@ The JSON payload contains a `steps` array, each entry with `title`, `status`
 
 ## sdci and `fonfon check`
 
-After `setup` completes, `fonfon check` validates sdci presence via the global
-pipx environment (`PIPX_HOME=/opt/pipx`). If sdci is not found there, the
-Packages section of the check report marks it as `FAIL`.
+After `setup` completes, `fonfon check` validates sdci presence by checking
+whether the `sdci-server` executable is on PATH. The `sdci` pipx package places
+this executable in `/usr/local/bin` (`PIPX_BIN_DIR`). If `sdci-server` is not
+found, the Packages section of the check report marks it as `FAIL`.
 
 !!! note "Debian-family only"
     Docker installation uses `apt`/`dpkg` and targets Debian. Tailscale and

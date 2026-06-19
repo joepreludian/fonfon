@@ -15,7 +15,7 @@ fonfon check --output json  # machine-readable JSON
 | Area | Items |
 |------|-------|
 | System | distro, architecture |
-| Packages | `sudo`, `docker-ce`, `tailscale`, `pipx` |
+| Packages | `sudo`, `docker-ce`, `tailscale`, `pipx`; plus `sdci` (detected via the `sdci-server` executable on PATH) |
 | Services | `docker`, `ssh`, `tailscaled` (systemd enabled/active) |
 | Network | per-interface IPv4 + best-effort public IP |
 | Docker | traefik running, listening on 80/443, attached to an external network |

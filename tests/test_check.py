@@ -125,7 +125,7 @@ def test_docker_all_ok_path():
 def test_sdci_installed_is_ok():
     pkgs = _items(_base(sdci_installed=True), "Packages")
     assert pkgs["sdci"].status is CheckStatus.OK
-    assert pkgs["sdci"].detail == "installed (pipx)"
+    assert pkgs["sdci"].detail == "installed (sdci-server)"
 
 
 def test_sdci_not_installed_is_fail():
