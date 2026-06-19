@@ -12,7 +12,7 @@ NAME := fonfon
 ARCH ?= aarch64
 
 .DEFAULT_GOAL := build
-.PHONY: build clean test test-integration debian-login debian-destroy
+.PHONY: build clean test test-integration debian-login debian-destroy debian-demo
 
 # pydantic-core ships per-platform wheels, so each --scie-platform (which picks the
 # embedded interpreter) is paired with a --platform (which picks the wheel target) so
@@ -41,3 +41,6 @@ debian-login: ## Build the scie, boot/reuse a Debian VM with fonfon on PATH, and
 
 debian-destroy: ## Stop and delete the Debian dev VM
 	ARCH=$(ARCH) bash tools/debian-dev.sh destroy
+
+debian-demo: ## Fresh-VM end-to-end: build, recreate VM, install fonfon, run check then setup preludian (ARCH=...)
+	ARCH=$(ARCH) bash tools/debian-dev.sh demo

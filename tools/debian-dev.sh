@@ -7,18 +7,23 @@
 # and drops you into a shell. Exiting the shell leaves the VM running so you can
 # log back in; `destroy` stops and deletes it.
 #
+# `demo` runs a full end-to-end on a FRESH VM: build, recreate, install, then
+# `fonfon check` followed by `fonfon setup preludian`.
+#
 # Usage:
 #   tools/debian-dev.sh login              # aarch64 (default)
 #   ARCH=x86_64 tools/debian-dev.sh login  # emulated x86_64
 #   tools/debian-dev.sh destroy
+#   tools/debian-dev.sh demo
 #
-# Normally invoked via `make debian-login` / `make debian-destroy`.
+# Normally invoked via `make debian-login` / `make debian-destroy` / `make debian-demo`.
 set -euo pipefail
 
 ARCH="${ARCH:-aarch64}"
 VM_NAME="${VM_NAME:-fonfon-dev}"        # distinct from the integration VM (fonfon-test)
 SCIE_IN_VM="/usr/local/bin/fonfon"      # on PATH so you can just type `fonfon`
 STAGE_IN_VM="/tmp/fonfon"               # scratch landing spot before install
+DEMO_USER="preludian"                   # operator user created by `make debian-demo`
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -70,6 +75,13 @@ build_scie() {
   fi
 }
 
+# Copy the freshly built scie into the running VM and install it onto PATH.
+inject_scie() {
+  echo ">> Injecting fresh scie -> ${VM_NAME}:${SCIE_IN_VM} ..."
+  limactl copy "${SCIE_HOST}" "${VM_NAME}:${STAGE_IN_VM}"
+  limactl shell "${VM_NAME}" -- sudo install -m 0755 "${STAGE_IN_VM}" "${SCIE_IN_VM}"
+}
+
 cmd_login() {
   require_lima
   check_arch
@@ -87,9 +99,7 @@ cmd_login() {
     echo ">> Reusing running VM '${VM_NAME}'."
   fi
 
-  echo ">> Injecting fresh scie -> ${VM_NAME}:${SCIE_IN_VM} ..."
-  limactl copy "${SCIE_HOST}" "${VM_NAME}:${STAGE_IN_VM}"
-  limactl shell "${VM_NAME}" -- sudo install -m 0755 "${STAGE_IN_VM}" "${SCIE_IN_VM}"
+  inject_scie
 
   cat <<EOF
 >> Ready. Entering '${VM_NAME}'. 'fonfon' is on PATH, e.g.:
@@ -109,11 +119,37 @@ cmd_destroy() {
   echo ">> Done."
 }
 
+# Full end-to-end on a FRESH VM: build, recreate the VM, install fonfon, then
+# run `fonfon check` (a fresh box is expected to report gaps) followed by
+# `fonfon setup ${DEMO_USER}`. The VM is left running afterwards for inspection.
+cmd_demo() {
+  require_lima
+  check_arch
+  build_scie
+
+  echo ">> Destroying any existing VM '${VM_NAME}' ..."
+  limactl delete -f "${VM_NAME}" >/dev/null 2>&1 || true
+
+  echo ">> Creating a fresh Debian VM '${VM_NAME}' (arch=${ARCH}) ..."
+  limactl start --name "${VM_NAME}" --arch "${ARCH}" --tty=false "${TEMPLATE}"
+
+  inject_scie
+
+  echo ">> Running 'fonfon check' (a fresh box is expected to report gaps) ..."
+  limactl shell "${VM_NAME}" -- sudo "${SCIE_IN_VM}" check || true
+
+  echo ">> Running 'fonfon setup ${DEMO_USER}' ..."
+  limactl shell "${VM_NAME}" -- sudo "${SCIE_IN_VM}" setup "${DEMO_USER}"
+
+  echo ">> Done. VM '${VM_NAME}' left running -- 'make debian-login' to enter, 'make debian-destroy' to remove."
+}
+
 case "${1:-}" in
   login) cmd_login ;;
   destroy) cmd_destroy ;;
+  demo) cmd_demo ;;
   *)
-    echo "usage: $0 {login|destroy}" >&2
+    echo "usage: $0 {login|destroy|demo}" >&2
     exit 2
     ;;
 esac
