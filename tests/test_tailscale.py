@@ -1,3 +1,5 @@
+import pytest
+
 from fonfon.system.tailscale import Tailscale
 from tests.fakes import completed
 
@@ -17,11 +19,8 @@ def test_up_invokes_tailscale_up_with_auth_key():
 
 def test_up_raises_on_failure():
     t = Tailscale(run=lambda args, timeout=10, env=None: completed(args, 1, "", "boom"))
-    try:
+    with pytest.raises(RuntimeError, match="boom"):
         t.up("k")
-        raise AssertionError("expected RuntimeError")
-    except RuntimeError as exc:
-        assert "boom" in str(exc)
 
 
 def test_ipv4_returns_first_address():

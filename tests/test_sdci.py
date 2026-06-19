@@ -1,3 +1,5 @@
+import pytest
+
 from fonfon.system.sdci import Sdci
 from tests.fakes import completed
 
@@ -24,21 +26,15 @@ def test_setup_invokes_sdci_server_setup():
 
 def test_setup_raises_on_failure():
     s = Sdci(run=lambda args, timeout=10, env=None: completed(args, 1, "", "nope"))
-    try:
+    with pytest.raises(RuntimeError, match="nope"):
         s.setup("ip", "tok")
-        raise AssertionError("expected RuntimeError")
-    except RuntimeError as exc:
-        assert "nope" in str(exc)
 
 
 def test_is_configured_true_when_config_present():
-    s = Sdci(
-        run=lambda *a, **k: completed([], 0),
-        exists=lambda path: path == "/etc/sdci/config",
-    )
+    s = Sdci(exists=lambda path: path == "/etc/sdci/config")
     assert s.is_configured() is True
 
 
 def test_is_configured_false_when_absent():
-    s = Sdci(run=lambda *a, **k: completed([], 0), exists=lambda path: False)
+    s = Sdci(exists=lambda path: False)
     assert s.is_configured() is False
