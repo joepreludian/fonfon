@@ -71,18 +71,17 @@ def setup(
 ) -> None:
     """Provision this server (Docker, Tailscale, pipx, sdci), join the tailnet,
     and configure sdci-server for an operator user."""
+    console = Console()
     if os.geteuid() != 0:
-        Console().print("[red]fonfon setup must be run as root.[/red]")
+        console.print("[red]fonfon setup must be run as root.[/red]")
         ctx.exit(1)
     if not tailscale_auth_key:
-        console = Console()
         console.print("[red]fonfon setup requires a Tailscale auth key.[/red]")
         console.print(
             "Generate one at: https://login.tailscale.com/admin/settings/keys"
         )
         console.print("Then re-run: fonfon setup <user> --tailscale-auth-key <key>")
         ctx.exit(1)
-    console = Console()
     if output_format == "json":
         report = run_setup(new_user, tailscale_auth_key)
         setup_json.render(report, console)
