@@ -14,13 +14,16 @@ ARCH ?= aarch64
 .DEFAULT_GOAL := build
 .PHONY: build clean test test-integration debian-login debian-destroy
 
+# pydantic-core ships per-platform wheels, so each --scie-platform (which picks the
+# embedded interpreter) is paired with a --platform (which picks the wheel target) so
+# the resolve bundles the matching cp314 wheel. Bump the cp-314 tag on a Python upgrade.
 build: ## Build self-contained linux + macOS (x86_64 and aarch64) executables into dist/
 	@mkdir -p $(DIST)
 	uv run pex . -c $(NAME) -o $(DIST)/$(NAME) --scie eager \
-		--scie-platform linux-x86_64 \
-		--scie-platform linux-aarch64 \
-		--scie-platform macos-x86_64 \
-		--scie-platform macos-aarch64 -v
+		--scie-platform linux-x86_64 --platform manylinux_2_17_x86_64-cp-314-cp314 \
+		--scie-platform linux-aarch64 --platform manylinux_2_17_aarch64-cp-314-cp314 \
+		--scie-platform macos-x86_64 --platform macosx_10_12_x86_64-cp-314-cp314 \
+		--scie-platform macos-aarch64 --platform macosx_11_0_arm64-cp-314-cp314 -v
 	@rm -f $(DIST)/$(NAME)
 	@echo "Built $(NAME) executables in $(DIST)/: linux-x86_64 linux-aarch64 macos-x86_64 macos-aarch64"
 

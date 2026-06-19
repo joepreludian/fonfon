@@ -57,8 +57,11 @@ build_scie() {
   echo ">> Building fonfon scie for linux-${ARCH} ..."
   (
     cd "${REPO_ROOT}"
+    # Pair the scie interpreter with the matching wheel target so pydantic-core's
+    # native cp314 wheel for this arch is bundled (see Makefile for the why).
     uv run pex . -c fonfon -o dist/fonfon --scie eager \
-      --scie-name-style platform-file-suffix --scie-platform "linux-${ARCH}"
+      --scie-name-style platform-file-suffix --scie-platform "linux-${ARCH}" \
+      --platform "manylinux_2_17_${ARCH}-cp-314-cp314"
     rm -f dist/fonfon
   )
   if [[ ! -x "${SCIE_HOST}" ]]; then
