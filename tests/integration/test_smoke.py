@@ -25,3 +25,18 @@ def test_fonfon_version_in_vm(vm_run):
     assert PROJECT_VERSION in result.stdout, (
         f"expected version {PROJECT_VERSION!r} in output, got: {result.stdout!r}"
     )
+
+
+@pytest.mark.integration
+def test_check_runs_on_real_debian(vm_run):
+    """`fonfon check --output json` emits valid JSON on a real Debian VM.
+
+    check may exit non-zero on an unprovisioned box (missing packages/services
+    are expected); we only assert that it ran and produced JSON output.
+    """
+    result = vm_run(f"sudo {vm_run.scie} check --output json")
+    # check may exit non-zero (unprovisioned box); we assert it ran and emitted JSON
+    assert '"sections"' in result.stdout, (
+        f"expected JSON with 'sections' key in stdout, got: {result.stdout!r}\n"
+        f"stderr: {result.stderr}"
+    )
