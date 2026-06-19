@@ -44,7 +44,9 @@ def test_build_steps_order_and_titles():
 
 def test_run_setup_calls_on_result_per_step(monkeypatch):
     steps = [FakeStep("A"), FakeStep("B", satisfied=True), FakeStep("C")]
-    monkeypatch.setattr("fonfon.services.setup.build_steps", lambda u, run=None: steps)
+    monkeypatch.setattr(
+        "fonfon.services.setup.build_steps", lambda u, k=None, run=None: steps
+    )
     collected = []
     report = run_setup("x", on_result=collected.append)
     assert len(collected) == 3
@@ -54,7 +56,9 @@ def test_run_setup_calls_on_result_per_step(monkeypatch):
 
 def test_run_setup_calls_on_step_start_per_step(monkeypatch):
     steps = [FakeStep("A"), FakeStep("B", satisfied=True), FakeStep("C")]
-    monkeypatch.setattr("fonfon.services.setup.build_steps", lambda u, run=None: steps)
+    monkeypatch.setattr(
+        "fonfon.services.setup.build_steps", lambda u, k=None, run=None: steps
+    )
     started = []
     results = []
     run_setup("x", on_step_start=started.append, on_result=results.append)
@@ -64,7 +68,9 @@ def test_run_setup_calls_on_step_start_per_step(monkeypatch):
 
 def test_run_setup_on_step_start_called_before_on_result(monkeypatch):
     steps = [FakeStep("A")]
-    monkeypatch.setattr("fonfon.services.setup.build_steps", lambda u, run=None: steps)
+    monkeypatch.setattr(
+        "fonfon.services.setup.build_steps", lambda u, k=None, run=None: steps
+    )
     events = []
     run_setup(
         "x",
@@ -92,3 +98,22 @@ def test_run_step_propagates_token_from_step():
 def test_run_step_token_none_for_plain_step():
     r = run_step(FakeStep("X"))
     assert r.token is None
+
+
+def test_build_steps_with_auth_key_appends_service_steps():
+    titles = [s.title for s in build_steps("jon", "tskey-abc")]
+    assert titles == [
+        "User",
+        "Docker",
+        "Docker group",
+        "Tailscale",
+        "pipx",
+        "sdci",
+        "Tailscale up",
+        "sdci config",
+    ]
+
+
+def test_build_steps_without_auth_key_is_install_only():
+    titles = [s.title for s in build_steps("jon")]
+    assert titles == ["User", "Docker", "Docker group", "Tailscale", "pipx", "sdci"]
