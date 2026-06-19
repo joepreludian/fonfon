@@ -8,7 +8,9 @@
 # log back in; `destroy` stops and deletes it.
 #
 # `demo` runs a full end-to-end on a FRESH VM: build, recreate, install, then
-# `fonfon check` followed by `fonfon setup preludian`.
+# `fonfon check` followed by `fonfon setup preludian`. Set TAILSCALE_AUTH_KEY in
+# the environment to also join the tailnet and configure sdci; without it the
+# setup stops at the required-key gate.
 #
 # Usage:
 #   tools/debian-dev.sh login              # aarch64 (default)
@@ -139,7 +141,13 @@ cmd_demo() {
   limactl shell "${VM_NAME}" -- sudo "${SCIE_IN_VM}" check || true
 
   echo ">> Running 'fonfon setup ${DEMO_USER}' ..."
-  limactl shell "${VM_NAME}" -- sudo "${SCIE_IN_VM}" setup "${DEMO_USER}"
+  if [[ -n "${TAILSCALE_AUTH_KEY:-}" ]]; then
+    limactl shell "${VM_NAME}" -- sudo "${SCIE_IN_VM}" \
+      setup "${DEMO_USER}" --tailscale-auth-key "${TAILSCALE_AUTH_KEY}"
+  else
+    echo ">> No TAILSCALE_AUTH_KEY in env -- setup will stop at the required-key gate (demo)."
+    limactl shell "${VM_NAME}" -- sudo "${SCIE_IN_VM}" setup "${DEMO_USER}" || true
+  fi
 
   echo ">> Done. VM '${VM_NAME}' left running -- 'make debian-login' to enter, 'make debian-destroy' to remove."
 }
