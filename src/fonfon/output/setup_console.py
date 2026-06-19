@@ -4,7 +4,8 @@ from rich.console import Console
 
 from fonfon import get_version
 from fonfon.models_setup import SetupReport, SetupStatus, StepResult
-from fonfon.ui import build_header
+from fonfon.services.setup_steps import SetupStep
+from fonfon.ui import build_action_box, build_header
 
 _STYLE: dict[SetupStatus, tuple[str, str]] = {
     SetupStatus.INSTALLED: ("green", "✓ INSTALLED"),
@@ -16,6 +17,16 @@ _STYLE: dict[SetupStatus, tuple[str, str]] = {
 def render_header(console: Console) -> None:
     """Print the Fonfon banner/header."""
     console.print(build_header(get_version()))
+
+
+def render_action(console: Console) -> None:
+    """Print the action box for the setup command."""
+    console.print(build_action_box("setup"))
+
+
+def render_step_start(step: SetupStep, console: Console) -> None:
+    """Print a header line for a step immediately before its output streams."""
+    console.print(f"[bold orange1]{step.title}[/bold orange1]")
 
 
 def render_step(result: StepResult, console: Console) -> None:
@@ -38,8 +49,9 @@ def render_summary(report: SetupReport, console: Console) -> None:
 
 
 def render(report: SetupReport, console: Console) -> None:
-    """Print header, step lines, and a summary footer."""
+    """Print header, action box, step lines, and a summary footer."""
     render_header(console)
+    render_action(console)
     for result in report.steps:
         render_step(result, console)
     render_summary(report, console)

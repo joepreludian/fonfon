@@ -6,7 +6,7 @@ from rich.console import Console
 
 from fonfon import get_version
 from fonfon.logo import CAT_LOGO
-from fonfon.ui import build_banner
+from fonfon.ui import build_action_box, build_banner
 
 
 def _render(renderable) -> str:
@@ -30,3 +30,13 @@ def test_banner_includes_hello_world():
 def test_banner_includes_cat_logo():
     first_logo_line = CAT_LOGO.splitlines()[0].strip()
     assert first_logo_line in _render(build_banner())
+
+
+def test_action_box_renders_and_contains_action_label():
+    out = _render(build_action_box("check"))
+    assert "check" in out
+
+
+def test_action_box_renders_setup_label():
+    out = _render(build_action_box("setup"))
+    assert "setup" in out

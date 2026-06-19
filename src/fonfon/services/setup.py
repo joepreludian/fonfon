@@ -12,17 +12,22 @@ from fonfon.services.setup_steps import (
     TailscaleStep,
     UserStep,
 )
+from fonfon.system._run import run as _default_run
+from fonfon.system.apt import Apt
+from fonfon.system.dpkg import Dpkg
+from fonfon.system.pipx import Pipx
+from fonfon.system.users import Users
 
 
-def build_steps(new_user: str) -> list[SetupStep]:
+def build_steps(new_user: str, run: Callable = _default_run) -> list[SetupStep]:
     """Return the six provisioning steps in execution order."""
     return [
-        UserStep(new_user),
-        DockerStep(),
-        DockerGroupStep(new_user),
-        TailscaleStep(),
-        PipxStep(),
-        SdciStep(),
+        UserStep(new_user, users=Users(run=run)),
+        DockerStep(apt=Apt(run=run), dpkg=Dpkg(run=run), run=run),
+        DockerGroupStep(new_user, users=Users(run=run)),
+        TailscaleStep(dpkg=Dpkg(run=run), run=run),
+        PipxStep(apt=Apt(run=run), dpkg=Dpkg(run=run)),
+        SdciStep(pipx=Pipx(run=run)),
     ]
 
 
@@ -42,11 +47,17 @@ def run_step(step: SetupStep) -> StepResult:
 
 
 def run_setup(
-    new_user: str, on_result: Callable[[StepResult], None] | None = None
+    new_user: str,
+    *,
+    run: Callable = _default_run,
+    on_step_start: Callable[[SetupStep], None] | None = None,
+    on_result: Callable[[StepResult], None] | None = None,
 ) -> SetupReport:
     """Run all provisioning steps and return the aggregated report."""
     results = []
-    for step in build_steps(new_user):
+    for step in build_steps(new_user, run=run):
+        if on_step_start is not None:
+            on_step_start(step)
         result = run_step(step)
         if on_result is not None:
             on_result(result)

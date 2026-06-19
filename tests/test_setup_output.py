@@ -30,6 +30,21 @@ def test_console_lists_steps_and_statuses():
     assert "INSTALLED" in out and "FAILED" in out
 
 
+def test_console_render_includes_action_box():
+    out = _render(setup_console)
+    assert "setup" in out
+
+
 def test_json_roundtrips():
     data = json_module.loads(_render(setup_json))
     assert data["steps"][1]["status"] == "failed"
+
+
+def test_render_step_start_includes_title():
+    class _StubStep:
+        title = "Docker"
+
+    buf = StringIO()
+    console = Console(file=buf, force_terminal=False, width=100)
+    setup_console.render_step_start(_StubStep(), console)
+    assert "Docker" in buf.getvalue()

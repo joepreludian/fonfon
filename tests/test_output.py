@@ -48,6 +48,11 @@ def test_console_render_includes_labels_and_section():
     assert "OK" in out
 
 
+def test_console_render_includes_action_box():
+    out = _render(console_renderer)
+    assert "check" in out
+
+
 def test_json_render_is_valid_and_roundtrips():
     out = _render(json_renderer)
     data = json_module.loads(out)

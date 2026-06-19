@@ -11,6 +11,7 @@ from fonfon.output import json as json_renderer
 from fonfon.output import setup_console, setup_json
 from fonfon.services.check import run_check
 from fonfon.services.setup import run_setup
+from fonfon.system.streaming import run_streamed
 from fonfon.ui import build_banner
 
 
@@ -66,8 +67,16 @@ def setup(ctx: click.Context, new_user: str, output_format: str) -> None:
         setup_json.render(report, console)
     else:
         setup_console.render_header(console)
+        setup_console.render_action(console)
+
+        def _runner(args, timeout=10, env=None):
+            return run_streamed(args, console, timeout=timeout, env=env)
+
         report = run_setup(
-            new_user, on_result=lambda r: setup_console.render_step(r, console)
+            new_user,
+            run=_runner,
+            on_step_start=lambda step: setup_console.render_step_start(step, console),
+            on_result=lambda r: setup_console.render_step(r, console),
         )
         setup_console.render_summary(report, console)
     ctx.exit(0 if report.ok else 1)

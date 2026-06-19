@@ -44,9 +44,31 @@ def test_build_steps_order_and_titles():
 
 def test_run_setup_calls_on_result_per_step(monkeypatch):
     steps = [FakeStep("A"), FakeStep("B", satisfied=True), FakeStep("C")]
-    monkeypatch.setattr("fonfon.services.setup.build_steps", lambda u: steps)
+    monkeypatch.setattr("fonfon.services.setup.build_steps", lambda u, run=None: steps)
     collected = []
     report = run_setup("x", on_result=collected.append)
     assert len(collected) == 3
     assert [r.title for r in collected] == ["A", "B", "C"]
     assert collected == report.steps
+
+
+def test_run_setup_calls_on_step_start_per_step(monkeypatch):
+    steps = [FakeStep("A"), FakeStep("B", satisfied=True), FakeStep("C")]
+    monkeypatch.setattr("fonfon.services.setup.build_steps", lambda u, run=None: steps)
+    started = []
+    results = []
+    run_setup("x", on_step_start=started.append, on_result=results.append)
+    assert [s.title for s in started] == ["A", "B", "C"]
+    assert [r.title for r in results] == ["A", "B", "C"]
+
+
+def test_run_setup_on_step_start_called_before_on_result(monkeypatch):
+    steps = [FakeStep("A")]
+    monkeypatch.setattr("fonfon.services.setup.build_steps", lambda u, run=None: steps)
+    events = []
+    run_setup(
+        "x",
+        on_step_start=lambda s: events.append(("start", s.title)),
+        on_result=lambda r: events.append(("result", r.title)),
+    )
+    assert events == [("start", "A"), ("result", "A")]

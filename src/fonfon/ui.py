@@ -22,6 +22,14 @@ def build_header(version: str) -> RenderableType:
     return grid
 
 
+def build_action_box(action: str) -> RenderableType:
+    """Small panel naming the action being performed."""
+    return Panel.fit(
+        Text(action, style=f"bold {ORANGE_BRIGHT}"),
+        border_style=ORANGE,
+    )
+
+
 def build_banner() -> RenderableType:
     """Build the orange hello banner: logo, project name, version, greeting."""
     body = Group(

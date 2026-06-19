@@ -21,7 +21,10 @@ def test_setup_requires_root(monkeypatch):
 
 def test_setup_runs_as_root_exit_zero(monkeypatch):
     monkeypatch.setattr("fonfon.cli.os.geteuid", lambda: 0)
-    monkeypatch.setattr("fonfon.cli.run_setup", lambda u, on_result=None: _ok_report())
+    monkeypatch.setattr(
+        "fonfon.cli.run_setup",
+        lambda u, run=None, on_step_start=None, on_result=None: _ok_report(),
+    )
     result = CliRunner().invoke(main, ["setup", "jon"])
     assert result.exit_code == 0
 
@@ -29,13 +32,19 @@ def test_setup_runs_as_root_exit_zero(monkeypatch):
 def test_setup_exit_one_on_failure(monkeypatch):
     monkeypatch.setattr("fonfon.cli.os.geteuid", lambda: 0)
     failed = SetupReport(steps=[StepResult(title="Docker", status=SetupStatus.FAILED)])
-    monkeypatch.setattr("fonfon.cli.run_setup", lambda u, on_result=None: failed)
+    monkeypatch.setattr(
+        "fonfon.cli.run_setup",
+        lambda u, run=None, on_step_start=None, on_result=None: failed,
+    )
     result = CliRunner().invoke(main, ["setup", "jon"])
     assert result.exit_code == 1
 
 
 def test_setup_json(monkeypatch):
     monkeypatch.setattr("fonfon.cli.os.geteuid", lambda: 0)
-    monkeypatch.setattr("fonfon.cli.run_setup", lambda u, on_result=None: _ok_report())
+    monkeypatch.setattr(
+        "fonfon.cli.run_setup",
+        lambda u, run=None, on_step_start=None, on_result=None: _ok_report(),
+    )
     result = CliRunner().invoke(main, ["setup", "jon", "--output", "json"])
     assert json_module.loads(result.output)["steps"][0]["status"] == "skipped"

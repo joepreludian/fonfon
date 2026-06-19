@@ -6,7 +6,7 @@ from rich.table import Table
 from fonfon import get_version
 from fonfon.logo import ORANGE_BRIGHT
 from fonfon.models import CheckReport, CheckStatus
-from fonfon.ui import build_header
+from fonfon.ui import build_action_box, build_header
 
 _STYLE: dict[CheckStatus, tuple[str, str]] = {
     CheckStatus.OK: ("green", "✓ OK"),
@@ -20,6 +20,7 @@ _STYLE: dict[CheckStatus, tuple[str, str]] = {
 def render(report: CheckReport, console: Console) -> None:
     """Print header, grouped status table, and a pass/fail summary footer."""
     console.print(build_header(get_version()))
+    console.print(build_action_box("check"))
     table = Table(show_header=True, header_style=f"bold {ORANGE_BRIGHT}", expand=False)
     table.add_column("Check")
     table.add_column("Status")
