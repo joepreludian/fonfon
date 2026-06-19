@@ -237,8 +237,8 @@ def test_tailscale_step_apply_raises_on_failure():
 # ── PipxStep ──────────────────────────────────────────────────────────────────
 
 
-def test_pipx_step_satisfied_when_python3_pipx_installed():
-    dpkg = FakeDpkg(installed_packages=["python3-pipx"])
+def test_pipx_step_satisfied_when_pipx_installed():
+    dpkg = FakeDpkg(installed_packages=["pipx"])
     assert PipxStep(dpkg=dpkg).is_satisfied() is True
 
 
@@ -247,10 +247,10 @@ def test_pipx_step_not_satisfied_when_not_installed():
     assert PipxStep(dpkg=dpkg).is_satisfied() is False
 
 
-def test_pipx_step_apply_installs_python3_pipx():
+def test_pipx_step_apply_installs_pipx():
     apt = FakeApt()
     PipxStep(apt=apt, dpkg=FakeDpkg()).apply()
-    assert ("install", ["python3-pipx"]) in apt.calls
+    assert ("install", ["pipx"]) in apt.calls
 
 
 def test_pipx_step_apply_updates_before_install():

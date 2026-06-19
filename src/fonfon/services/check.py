@@ -12,7 +12,7 @@ from fonfon.services.package_service import PackageReport, PackageService
 from fonfon.services.systemd_service import ServicesReport, SystemdService
 from fonfon.system.pipx import Pipx
 
-PACKAGES = ["sudo", "docker-ce", "tailscale", "python3-pipx"]
+PACKAGES = ["sudo", "docker-ce", "tailscale", "pipx"]
 SERVICES = ["docker", "ssh", "tailscaled"]
 TRAEFIK_PORTS = [80, 443]
 

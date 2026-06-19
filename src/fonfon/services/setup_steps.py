@@ -135,7 +135,7 @@ class TailscaleStep(SetupStep):
 
 
 class PipxStep(SetupStep):
-    """Install python3-pipx via apt."""
+    """Install pipx via apt."""
 
     title = "pipx"
 
@@ -144,11 +144,11 @@ class PipxStep(SetupStep):
         self._dpkg = dpkg or Dpkg()
 
     def is_satisfied(self) -> bool:
-        return self._dpkg.query("python3-pipx").installed
+        return self._dpkg.query("pipx").installed
 
     def apply(self) -> None:
         self._apt.update()
-        self._apt.install("python3-pipx")
+        self._apt.install("pipx")
 
 
 class SdciStep(SetupStep):

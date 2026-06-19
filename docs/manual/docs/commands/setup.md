@@ -27,7 +27,7 @@ sudo fonfon setup <new_user> --output json    # machine-readable JSON
 | 2 | **Docker** | Adds the official Docker apt keyring and repository, then installs `docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-buildx-plugin`, and `docker-compose-plugin` |
 | 3 | **Docker group** | Adds `<new_user>` to the `docker` group so containers can be managed without `sudo` |
 | 4 | **Tailscale** | Runs the official `curl \| sh` install script from `tailscale.com` |
-| 5 | **pipx** | Installs `python3-pipx` via apt |
+| 5 | **pipx** | Installs `pipx` via apt |
 | 6 | **sdci** | Installs `sdci` globally via pipx (`PIPX_HOME=/opt/pipx`, `PIPX_BIN_DIR=/usr/local/bin`) so it is available system-wide |
 
 ## Idempotency and error handling
