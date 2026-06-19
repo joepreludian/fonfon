@@ -48,3 +48,44 @@ def test_render_step_start_includes_title():
     console = Console(file=buf, force_terminal=False, width=100)
     setup_console.render_step_start(_StubStep(), console)
     assert "Docker" in buf.getvalue()
+
+
+def _report_with_token():
+    return SetupReport(
+        steps=[
+            StepResult(
+                title="sdci config",
+                status=SetupStatus.INSTALLED,
+                detail="installed",
+                token="T" * 42,
+            ),
+        ]
+    )
+
+
+def _render_summary(report):
+    buf = StringIO()
+    setup_console.render_summary(
+        report, Console(file=buf, force_terminal=False, width=100)
+    )
+    return buf.getvalue()
+
+
+def test_console_summary_prints_token_when_present():
+    out = _render_summary(_report_with_token())
+    assert "sdci token" in out
+    assert "T" * 42 in out
+
+
+def test_console_summary_omits_token_when_absent():
+    out = _render_summary(_report())
+    assert "sdci token" not in out
+
+
+def test_json_includes_token_field():
+    buf = StringIO()
+    setup_json.render(
+        _report_with_token(), Console(file=buf, force_terminal=False, width=100)
+    )
+    data = json_module.loads(buf.getvalue())
+    assert data["steps"][0]["token"] == "T" * 42

@@ -37,7 +37,7 @@ def render_step(result: StepResult, console: Console) -> None:
 
 
 def render_summary(report: SetupReport, console: Console) -> None:
-    """Print the counts footer."""
+    """Print the counts footer and, if one was generated, the sdci token."""
     installed = sum(1 for s in report.steps if s.status is SetupStatus.INSTALLED)
     skipped = sum(1 for s in report.steps if s.status is SetupStatus.SKIPPED)
     failed = sum(1 for s in report.steps if s.status is SetupStatus.FAILED)
@@ -46,6 +46,11 @@ def render_summary(report: SetupReport, console: Console) -> None:
         f"[dim]{skipped} skipped[/dim] · "
         f"[red]{failed} failed[/red]"
     )
+    token = next((s.token for s in report.steps if s.token), None)
+    if token:
+        console.print(
+            f"[bold]sdci token:[/bold] {token}  [dim](stored in /etc/sdci/config)[/dim]"
+        )
 
 
 def render(report: SetupReport, console: Console) -> None:
