@@ -24,6 +24,12 @@ All OS interaction lives in `system/` boundary adapters (`Systemctl`, `Dpkg`,
 without a real server. Package detection uses a Strategy keyed on distro
 (`services/package_backends.py`); only Debian/dpkg ships today.
 
+The **mutating counterpart** is `setup`: each action is a `SetupStep`
+(`is_satisfied()` probe + `apply()` mutation); `run_setup` runs all steps with
+continue-on-error and collects results into a `SetupReport`. Mutating boundary
+adapters `Apt`, `Users`, and `Pipx` (in `system/`) sit beside the read-only
+probes and follow the same injectable-runner pattern.
+
 Runtime deps: click, rich, pydantic.
 
 ## Conventions

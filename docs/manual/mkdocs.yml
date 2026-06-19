@@ -37,6 +37,7 @@ nav:
   - Getting Started: getting-started.md
   - Commands:
       - check: commands/check.md
+      - setup: commands/setup.md
 
 markdown_extensions:
   - admonition
