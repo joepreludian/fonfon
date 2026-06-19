@@ -12,7 +12,7 @@ NAME := fonfon
 ARCH ?= aarch64
 
 .DEFAULT_GOAL := build
-.PHONY: build clean test test-integration
+.PHONY: build clean test test-integration debian-login debian-destroy
 
 build: ## Build self-contained linux + macOS (x86_64 and aarch64) executables into dist/
 	@mkdir -p $(DIST)
@@ -32,3 +32,9 @@ test: ## Run the fast unit test suite (no VM)
 
 test-integration: ## Boot a Debian VM and run the integration suite (ARCH=aarch64|x86_64)
 	ARCH=$(ARCH) bash tests/integration/run.sh
+
+debian-login: ## Build the scie, boot/reuse a Debian VM with fonfon on PATH, and open a shell (ARCH=aarch64|x86_64)
+	ARCH=$(ARCH) bash tools/debian-dev.sh login
+
+debian-destroy: ## Stop and delete the Debian dev VM
+	ARCH=$(ARCH) bash tools/debian-dev.sh destroy
