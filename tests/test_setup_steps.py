@@ -11,8 +11,10 @@ from fonfon.services.setup_steps import (
     DockerGroupStep,
     DockerStep,
     PipxStep,
+    SdciConfigStep,
     SdciStep,
     TailscaleStep,
+    TailscaleUpStep,
     UserStep,
 )
 from fonfon.system.dpkg import PackageState
@@ -277,3 +279,75 @@ def test_sdci_step_apply_calls_install_global():
     pipx = FakePipx()
     SdciStep(pipx=pipx).apply()
     assert ("install_global", "sdci") in pipx.calls
+
+
+class FakeTailscale:
+    def __init__(self, ip=None):
+        self._ip = ip
+        self.upped_with = None
+
+    def ipv4(self):
+        return self._ip
+
+    def up(self, auth_key):
+        self.upped_with = auth_key
+        self._ip = "100.64.0.1"
+
+
+class FakeSdci:
+    def __init__(self, configured=False):
+        self._configured = configured
+        self.setup_args = None
+
+    def is_configured(self):
+        return self._configured
+
+    def setup(self, ip, token):
+        self.setup_args = (ip, token)
+
+
+def test_tailscale_up_satisfied_when_ip_present():
+    step = TailscaleUpStep("k", tailscale=FakeTailscale(ip="100.64.0.1"))
+    assert step.is_satisfied() is True
+
+
+def test_tailscale_up_not_satisfied_without_ip():
+    step = TailscaleUpStep("k", tailscale=FakeTailscale(ip=None))
+    assert step.is_satisfied() is False
+
+
+def test_tailscale_up_apply_calls_up_with_key():
+    ts = FakeTailscale(ip=None)
+    TailscaleUpStep("tskey-xyz", tailscale=ts).apply()
+    assert ts.upped_with == "tskey-xyz"
+
+
+def test_sdci_config_satisfied_when_configured():
+    step = SdciConfigStep(
+        tailscale=FakeTailscale(ip="100.64.0.1"), sdci=FakeSdci(configured=True)
+    )
+    assert step.is_satisfied() is True
+
+
+def test_sdci_config_not_satisfied_when_unconfigured():
+    step = SdciConfigStep(
+        tailscale=FakeTailscale(ip="100.64.0.1"), sdci=FakeSdci(configured=False)
+    )
+    assert step.is_satisfied() is False
+
+
+def test_sdci_config_apply_configures_with_ip_and_token():
+    ts = FakeTailscale(ip="100.64.0.1")
+    sdci = FakeSdci()
+    step = SdciConfigStep(tailscale=ts, sdci=sdci, token_factory=lambda: "T" * 42)
+    step.apply()
+    assert sdci.setup_args == ("100.64.0.1", "T" * 42)
+    assert step.token == "T" * 42
+
+
+def test_sdci_config_apply_raises_without_ip():
+    step = SdciConfigStep(
+        tailscale=FakeTailscale(ip=None), sdci=FakeSdci(), token_factory=lambda: "T"
+    )
+    with pytest.raises(RuntimeError):
+        step.apply()

@@ -3,11 +3,14 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 
+from fonfon.services.token import generate_token
 from fonfon.system import probes
 from fonfon.system._run import run as _default_run
 from fonfon.system.apt import Apt
 from fonfon.system.dpkg import Dpkg
 from fonfon.system.pipx import Pipx
+from fonfon.system.sdci import Sdci
+from fonfon.system.tailscale import Tailscale
 from fonfon.system.users import Users
 
 SDCI_PACKAGE = "sdci"
@@ -168,3 +171,48 @@ class SdciStep(SetupStep):
 
     def apply(self) -> None:
         self._pipx.install_global(SDCI_PACKAGE)
+
+
+class TailscaleUpStep(SetupStep):
+    """Join the tailnet with an auth key."""
+
+    title = "Tailscale up"
+
+    def __init__(self, auth_key: str, tailscale: Tailscale | None = None) -> None:
+        self._auth_key = auth_key
+        self._tailscale = tailscale or Tailscale()
+
+    def is_satisfied(self) -> bool:
+        return self._tailscale.ipv4() is not None
+
+    def apply(self) -> None:
+        self._tailscale.up(self._auth_key)
+
+
+class SdciConfigStep(SetupStep):
+    """Configure sdci-server against the tailnet IP with a generated token."""
+
+    title = "sdci config"
+
+    def __init__(
+        self,
+        tailscale: Tailscale | None = None,
+        sdci: Sdci | None = None,
+        token_factory: Callable[[], str] = generate_token,
+    ) -> None:
+        self._tailscale = tailscale or Tailscale()
+        self._sdci = sdci or Sdci()
+        self._token_factory = token_factory
+
+    def is_satisfied(self) -> bool:
+        return self._sdci.is_configured()
+
+    def apply(self) -> None:
+        ip = self._tailscale.ipv4()
+        if ip is None:
+            raise RuntimeError(
+                "no Tailscale IPv4 available; is `tailscale up` complete?"
+            )
+        token = self._token_factory()
+        self._sdci.setup(ip, token)
+        self.token = token
