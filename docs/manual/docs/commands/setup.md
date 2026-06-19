@@ -71,7 +71,8 @@ sudo fonfon setup deploy --output json | jq .
 ```
 
 The JSON payload contains a `steps` array, each entry with `title`, `status`
-(`installed` \| `skipped` \| `failed`), and an optional `detail` string.
+(`installed` \| `skipped` \| `failed`), an optional `detail` string, and an
+optional `token` string (set on the `sdci config` step — see below).
 
 ## The sdci token
 
