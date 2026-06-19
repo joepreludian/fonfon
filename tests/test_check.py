@@ -1,0 +1,121 @@
+# tests/test_check.py
+from fonfon.models import CheckStatus
+from fonfon.services.check import build_report
+from fonfon.services.docker_service import DockerReport
+from fonfon.services.network_service import NetworkInfo
+from fonfon.services.os_service import OSInfo
+from fonfon.services.package_service import PackageReport
+from fonfon.services.systemd_service import ServicesReport, ServiceState
+from fonfon.system.dpkg import PackageState
+
+
+def _items(report, title):
+    section = next(s for s in report.sections if s.title == title)
+    return {i.label: i for i in section.items}
+
+
+def _base(**over):
+    args = dict(
+        os_info=OSInfo(distro="Debian 12", distro_id="debian", architecture="x86_64"),
+        packages=PackageReport(
+            packages=[
+                PackageState(name="sudo", installed=True, version="1.9"),
+                PackageState(name="docker-ce", installed=False, version=None),
+            ]
+        ),
+        services=ServicesReport(
+            services=[
+                ServiceState(name="ssh", present=True, enabled=True, active=True),
+                ServiceState(name="docker", present=False, enabled=False, active=False),
+            ]
+        ),
+        network=NetworkInfo(
+            interfaces={"eth0": "203.0.113.5"}, public_ip="203.0.113.5"
+        ),
+        docker=DockerReport(docker_installed=False),
+    )
+    args.update(over)
+    return build_report(**args)
+
+
+def test_system_items_are_info():
+    report = _base()
+    assert _items(report, "System")["Architecture"].status is CheckStatus.INFO
+
+
+def test_installed_package_ok_missing_fail():
+    pkgs = _items(_base(), "Packages")
+    assert pkgs["sudo"].status is CheckStatus.OK
+    assert pkgs["docker-ce"].status is CheckStatus.FAIL
+
+
+def test_enabled_service_ok_disabled_fail():
+    svcs = _items(_base(), "Services")
+    assert svcs["ssh"].status is CheckStatus.OK
+    assert svcs["docker"].status is CheckStatus.FAIL
+
+
+def test_network_items_are_info():
+    net = _items(_base(), "Network")
+    assert all(i.status is CheckStatus.INFO for i in net.values())
+
+
+def test_docker_absent_section_is_skip():
+    dock = _items(_base(), "Docker")
+    assert all(i.status is CheckStatus.SKIP for i in dock.values())
+
+
+def test_docker_gaps_are_warn():
+    report = _base(
+        docker=DockerReport(
+            docker_installed=True,
+            service="traefik",
+            present=False,
+            listening={80: False, 443: False},
+            external_network=False,
+        )
+    )
+    dock = _items(report, "Docker")
+    assert all(i.status is CheckStatus.WARN for i in dock.values())
+
+
+def test_unsupported_distro_packages_section_is_skip():
+    report = _base(packages=None)
+    pkgs = _items(report, "Packages")
+    assert all(i.status is CheckStatus.SKIP for i in pkgs.values())
+
+
+def test_report_ok_false_when_fail_present():
+    assert _base().ok is False
+
+
+def test_service_present_but_disabled_is_fail_not_not_found():
+    svc = ServicesReport(
+        services=[
+            ServiceState(name="docker", present=True, enabled=False, active=False)
+        ]
+    )
+    item = _items(_base(services=svc), "Services")["docker"]
+    assert item.status is CheckStatus.FAIL
+    assert item.detail == "not enabled"
+
+
+def test_service_enabled_but_inactive_detail():
+    svc = ServicesReport(
+        services=[ServiceState(name="ssh", present=True, enabled=True, active=False)]
+    )
+    item = _items(_base(services=svc), "Services")["ssh"]
+    assert item.status is CheckStatus.OK
+    assert item.detail == "enabled, inactive"
+
+
+def test_docker_all_ok_path():
+    docker = DockerReport(
+        docker_installed=True,
+        service="traefik",
+        present=True,
+        listening={80: True, 443: True},
+        external_network=True,
+    )
+    items = _items(_base(docker=docker), "Docker")
+    assert all(i.status is CheckStatus.OK for i in items.values())

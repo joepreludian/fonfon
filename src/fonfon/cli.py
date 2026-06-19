@@ -4,6 +4,9 @@ import click
 from rich.console import Console
 
 from fonfon import get_version
+from fonfon.output import console as console_renderer
+from fonfon.output import json as json_renderer
+from fonfon.services.check import run_check
 from fonfon.ui import build_banner
 
 
@@ -14,6 +17,27 @@ def main(ctx: click.Context) -> None:
     """Fonfon — an opinionated VPS configurator."""
     if ctx.invoked_subcommand is None:
         Console().print(build_banner())
+
+
+@main.command()
+@click.option(
+    "-o",
+    "--output",
+    "output_format",
+    type=click.Choice(["console", "json"]),
+    default="console",
+    help="Output format.",
+)
+@click.pass_context
+def check(ctx: click.Context, output_format: str) -> None:
+    """Report whether this system is ready to serve applications."""
+    report = run_check()
+    console = Console()
+    if output_format == "json":
+        json_renderer.render(report, console)
+    else:
+        console_renderer.render(report, console)
+    ctx.exit(0 if report.ok else 1)
 
 
 if __name__ == "__main__":
