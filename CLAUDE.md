@@ -31,6 +31,7 @@ Runtime deps: click, rich, pydantic.
 - In doubt Prefer clarity to cleverness.
 - Use pytest to develop unit tests.
 - Before commiting code, run `pre-commit` hooks.
+- Bump the version in `pyproject.toml` on every change to the project — a full feature/project or a simple task alike (semver: patch for fixes/chores/docs, minor for new features).
 - Commits MUST use conventional commits.
 - DO NOT use "Co-authored by Claude". I'm solely responsible for the commits.
 - New /superpowers:brainstorming plans must go to `docs/specs`.
