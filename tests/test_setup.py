@@ -72,3 +72,23 @@ def test_run_setup_on_step_start_called_before_on_result(monkeypatch):
         on_result=lambda r: events.append(("result", r.title)),
     )
     assert events == [("start", "A"), ("result", "A")]
+
+
+def test_run_step_propagates_token_from_step():
+    class TokenStep(SetupStep):
+        title = "T"
+
+        def is_satisfied(self):
+            return False
+
+        def apply(self):
+            self.token = "abc123"
+
+    r = run_step(TokenStep())
+    assert r.status is SetupStatus.INSTALLED
+    assert r.token == "abc123"
+
+
+def test_run_step_token_none_for_plain_step():
+    r = run_step(FakeStep("X"))
+    assert r.token is None

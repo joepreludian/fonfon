@@ -30,6 +30,7 @@ class SetupStep(ABC):
     """Base class for an idempotent provisioning action."""
 
     title: str
+    token: str | None = None  # steps that produce a secret expose it here
 
     @abstractmethod
     def is_satisfied(self) -> bool:

@@ -40,7 +40,10 @@ def run_step(step: SetupStep) -> StepResult:
     try:
         step.apply()
         return StepResult(
-            title=step.title, status=SetupStatus.INSTALLED, detail="installed"
+            title=step.title,
+            status=SetupStatus.INSTALLED,
+            detail="installed",
+            token=step.token,
         )
     except Exception as exc:  # noqa: BLE001 — continue-on-error by design
         return StepResult(title=step.title, status=SetupStatus.FAILED, detail=str(exc))

@@ -15,6 +15,7 @@ class StepResult(BaseModel):
     title: str
     status: SetupStatus
     detail: str | None = None
+    token: str | None = None
 
 
 class SetupReport(BaseModel):

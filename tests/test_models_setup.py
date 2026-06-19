@@ -18,3 +18,13 @@ def test_ok_true_without_failures():
 
 def test_ok_false_with_failure():
     assert _report(SetupStatus.INSTALLED, SetupStatus.FAILED).ok is False
+
+
+def test_step_result_token_defaults_none():
+    r = StepResult(title="x", status=SetupStatus.SKIPPED)
+    assert r.token is None
+
+
+def test_step_result_token_roundtrips_in_dump():
+    r = StepResult(title="sdci config", status=SetupStatus.INSTALLED, token="abc123")
+    assert r.model_dump()["token"] == "abc123"
