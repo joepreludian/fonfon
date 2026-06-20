@@ -1,6 +1,6 @@
 # tests/test_check.py
 from fonfon.models import CheckStatus
-from fonfon.services.check import build_report
+from fonfon.services.check import SERVICES, build_report
 from fonfon.services.docker_service import DockerReport
 from fonfon.services.network_service import NetworkInfo
 from fonfon.services.os_service import OSInfo
@@ -143,6 +143,4 @@ def test_unsupported_distro_still_includes_sdci_item():
 
 
 def test_services_list_includes_sdci_server():
-    from fonfon.services.check import SERVICES
-
     assert "sdci-server" in SERVICES

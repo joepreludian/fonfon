@@ -41,7 +41,7 @@ FONFON_TAILSCALE_AUTH_KEY=<key> sudo -E fonfon setup <new_user>   # key via env
 | 6 | **sdci** | Installs the `sdci` pipx package globally (`PIPX_HOME=/opt/pipx`, `PIPX_BIN_DIR=/usr/local/bin`), which provides the `sdci-server` executable |
 | 7 | **Tailscale up** | Joins the tailnet with `tailscale up --auth-key <key>`, yielding a `100.x` tailnet IPv4 (skipped if already connected) |
 | 8 | **sdci dirs** | Creates `/home/<user>/services/sdci/{tasks,uploads}`, owned by the operator user, mode `0700` (skipped if they already exist) |
-| 9 | **sdci config** | Generates a random 42-char token and runs `sdci-server setup --ip <ip> --token <token> --uploads-dir <…/uploads> --tasks-dir <…/tasks> --user <user>`, so the service runs as the operator user; stores config in `/etc/sdci/config` and registers its own systemd unit (skipped if `/etc/sdci/config` exists) |
+| 9 | **sdci config** | Generates a random 42-char token and runs `sdci-server setup --ip <tailnet-ip> --token <token> --uploads-dir <…/uploads> --tasks-dir <…/tasks> --user <user>`, so the service runs as the operator user; stores config in `/etc/sdci/config` and registers its own systemd unit (skipped if `/etc/sdci/config` exists) |
 
 ## Idempotency and error handling
 
@@ -96,7 +96,9 @@ copy, so **record it when you see it**. The same fields appear under the
 After `setup` completes, `fonfon check` validates sdci presence by checking
 whether the `sdci-server` executable is on PATH. The `sdci` pipx package places
 this executable in `/usr/local/bin` (`PIPX_BIN_DIR`). If `sdci-server` is not
-found, the Packages section of the check report marks it as `FAIL`.
+found, the Packages section of the check report marks it as `FAIL`. In addition,
+`fonfon check` reports the `sdci-server` systemd unit in the **Services** section
+— it must be enabled and active for that check to pass.
 
 !!! note "Debian-family only"
     Docker installation uses `apt`/`dpkg` and targets Debian. Tailscale and
