@@ -79,6 +79,7 @@ def _render_summary(report):
 def test_console_summary_renders_deployment_panel():
     out = _render_summary(_report_with_deployment())
     assert "sdci-server deployed" in out
+    assert "/home/p/services/sdci" in out
     assert "/home/p/services/sdci/tasks" in out
     assert "/home/p/services/sdci/uploads" in out
     assert "T" * 42 in out

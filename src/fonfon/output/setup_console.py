@@ -39,6 +39,7 @@ def render_step(result: StepResult, console: Console) -> None:
 
 
 def _deployment_panel(deployment: SdciDeployment) -> Panel:
+    """Return a Panel summarising the sdci-server deployment."""
     table = Table.grid(padding=(0, 2))
     table.add_column(style="bold")
     table.add_column()
@@ -50,7 +51,8 @@ def _deployment_panel(deployment: SdciDeployment) -> Panel:
 
 
 def render_summary(report: SetupReport, console: Console) -> None:
-    """Print the counts footer and, if one was generated, the sdci token."""
+    """Print the counts footer and, if sdci-server was deployed, a panel of its
+    directories and token."""
     installed = sum(1 for s in report.steps if s.status is SetupStatus.INSTALLED)
     skipped = sum(1 for s in report.steps if s.status is SetupStatus.SKIPPED)
     failed = sum(1 for s in report.steps if s.status is SetupStatus.FAILED)
