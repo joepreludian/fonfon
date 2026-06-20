@@ -21,9 +21,24 @@ class Sdci:
     def is_configured(self) -> bool:
         return self._exists(SDCI_CONFIG_PATH)
 
-    def setup(self, ip: str, token: str) -> None:
+    def setup(
+        self, ip: str, token: str, uploads_dir: str, tasks_dir: str, user: str
+    ) -> None:
         proc = self._run(
-            ["sdci-server", "setup", "--ip", ip, "--token", token],
+            [
+                "sdci-server",
+                "setup",
+                "--ip",
+                ip,
+                "--token",
+                token,
+                "--uploads-dir",
+                uploads_dir,
+                "--tasks-dir",
+                tasks_dir,
+                "--user",
+                user,
+            ],
             timeout=SDCI_SETUP_TIMEOUT,
         )
         if proc.returncode != 0:

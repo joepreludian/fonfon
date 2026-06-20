@@ -110,6 +110,7 @@ def test_build_steps_with_auth_key_appends_service_steps():
         "pipx",
         "sdci",
         "Tailscale up",
+        "sdci dirs",
         "sdci config",
     ]
 

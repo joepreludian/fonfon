@@ -12,7 +12,7 @@ def test_setup_invokes_sdci_server_setup():
         seen["timeout"] = timeout
         return completed(args, 0, "")
 
-    Sdci(run=run).setup("100.64.0.1", "tok")
+    Sdci(run=run).setup("100.64.0.1", "tok", "/u/up", "/u/tk", "preludian")
     assert seen["args"] == [
         "sdci-server",
         "setup",
@@ -20,6 +20,12 @@ def test_setup_invokes_sdci_server_setup():
         "100.64.0.1",
         "--token",
         "tok",
+        "--uploads-dir",
+        "/u/up",
+        "--tasks-dir",
+        "/u/tk",
+        "--user",
+        "preludian",
     ]
     assert seen["timeout"] >= 60
 
@@ -27,7 +33,7 @@ def test_setup_invokes_sdci_server_setup():
 def test_setup_raises_on_failure():
     s = Sdci(run=lambda args, timeout=10, env=None: completed(args, 1, "", "nope"))
     with pytest.raises(RuntimeError, match="nope"):
-        s.setup("ip", "tok")
+        s.setup("ip", "tok", "/up", "/tk", "u")
 
 
 def test_is_configured_true_when_config_present():

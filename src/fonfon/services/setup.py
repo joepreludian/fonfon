@@ -3,11 +3,13 @@
 from collections.abc import Callable
 
 from fonfon.models_setup import SetupReport, SetupStatus, StepResult
+from fonfon.services.sdci_paths import sdci_paths
 from fonfon.services.setup_steps import (
     DockerGroupStep,
     DockerStep,
     PipxStep,
     SdciConfigStep,
+    SdciDirsStep,
     SdciStep,
     SetupStep,
     TailscaleStep,
@@ -17,6 +19,7 @@ from fonfon.services.setup_steps import (
 from fonfon.system._run import run as _default_run
 from fonfon.system.apt import Apt
 from fonfon.system.dpkg import Dpkg
+from fonfon.system.fs import Fs
 from fonfon.system.pipx import Pipx
 from fonfon.system.sdci import Sdci
 from fonfon.system.tailscale import Tailscale
@@ -40,8 +43,17 @@ def build_steps(
         SdciStep(pipx=Pipx(run=run)),
     ]
     if auth_key:
+        paths = sdci_paths(new_user)
         steps.append(TailscaleUpStep(auth_key, tailscale=Tailscale(run=run)))
-        steps.append(SdciConfigStep(tailscale=Tailscale(run=run), sdci=Sdci(run=run)))
+        steps.append(SdciDirsStep(new_user, paths, fs=Fs(run=run)))
+        steps.append(
+            SdciConfigStep(
+                new_user,
+                paths,
+                tailscale=Tailscale(run=run),
+                sdci=Sdci(run=run),
+            )
+        )
     return steps
 
 

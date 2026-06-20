@@ -199,10 +199,14 @@ class SdciConfigStep(SetupStep):
 
     def __init__(
         self,
+        user: str,
+        paths: SdciPaths,
         tailscale: Tailscale | None = None,
         sdci: Sdci | None = None,
         token_factory: Callable[[], str] = generate_token,
     ) -> None:
+        self._user = user
+        self._paths = paths
         self._tailscale = tailscale or Tailscale()
         self._sdci = sdci or Sdci()
         self._token_factory = token_factory
@@ -217,7 +221,7 @@ class SdciConfigStep(SetupStep):
                 "no Tailscale IPv4 available; is `tailscale up` complete?"
             )
         token = self._token_factory()
-        self._sdci.setup(ip, token)
+        self._sdci.setup(ip, token, self._paths.uploads, self._paths.tasks, self._user)
         self.token = token
 
 

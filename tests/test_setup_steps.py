@@ -304,8 +304,8 @@ class FakeSdci:
     def is_configured(self):
         return self._configured
 
-    def setup(self, ip, token):
-        self.setup_args = (ip, token)
+    def setup(self, ip, token, uploads_dir, tasks_dir, user):
+        self.setup_args = (ip, token, uploads_dir, tasks_dir, user)
 
 
 def test_tailscale_up_satisfied_when_ip_present():
@@ -324,32 +324,53 @@ def test_tailscale_up_apply_calls_up_with_key():
     assert ts.upped_with == "tskey-xyz"
 
 
+PATHS = sdci_paths("preludian")
+
+
 def test_sdci_config_satisfied_when_configured():
     step = SdciConfigStep(
-        tailscale=FakeTailscale(ip="100.64.0.1"), sdci=FakeSdci(configured=True)
+        "preludian",
+        PATHS,
+        tailscale=FakeTailscale(ip="100.64.0.1"),
+        sdci=FakeSdci(configured=True),
     )
     assert step.is_satisfied() is True
 
 
 def test_sdci_config_not_satisfied_when_unconfigured():
     step = SdciConfigStep(
-        tailscale=FakeTailscale(ip="100.64.0.1"), sdci=FakeSdci(configured=False)
+        "preludian",
+        PATHS,
+        tailscale=FakeTailscale(ip="100.64.0.1"),
+        sdci=FakeSdci(configured=False),
     )
     assert step.is_satisfied() is False
 
 
-def test_sdci_config_apply_configures_with_ip_and_token():
+def test_sdci_config_apply_configures_with_dirs_and_user():
     ts = FakeTailscale(ip="100.64.0.1")
     sdci = FakeSdci()
-    step = SdciConfigStep(tailscale=ts, sdci=sdci, token_factory=lambda: "T" * 42)
+    step = SdciConfigStep(
+        "preludian", PATHS, tailscale=ts, sdci=sdci, token_factory=lambda: "T" * 42
+    )
     step.apply()
-    assert sdci.setup_args == ("100.64.0.1", "T" * 42)
+    assert sdci.setup_args == (
+        "100.64.0.1",
+        "T" * 42,
+        PATHS.uploads,
+        PATHS.tasks,
+        "preludian",
+    )
     assert step.token == "T" * 42
 
 
 def test_sdci_config_apply_raises_without_ip():
     step = SdciConfigStep(
-        tailscale=FakeTailscale(ip=None), sdci=FakeSdci(), token_factory=lambda: "T"
+        "preludian",
+        PATHS,
+        tailscale=FakeTailscale(ip=None),
+        sdci=FakeSdci(),
+        token_factory=lambda: "T",
     )
     with pytest.raises(RuntimeError):
         step.apply()
