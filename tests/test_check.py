@@ -140,3 +140,9 @@ def test_unsupported_distro_still_includes_sdci_item():
     # dpkg SKIP row is present alongside the sdci OK row
     assert pkgs["packages"].status is CheckStatus.SKIP
     assert pkgs["sdci"].status is CheckStatus.OK
+
+
+def test_services_list_includes_sdci_server():
+    from fonfon.services.check import SERVICES
+
+    assert "sdci-server" in SERVICES
