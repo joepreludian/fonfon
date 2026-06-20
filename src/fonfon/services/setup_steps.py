@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 
+from fonfon.models_setup import SdciDeployment
 from fonfon.services.sdci_paths import SdciPaths
 from fonfon.services.token import generate_token
 from fonfon.system import probes
@@ -36,7 +37,7 @@ class SetupStep(ABC):
     """Base class for an idempotent provisioning action."""
 
     title: str
-    token: str | None = None  # steps that produce a secret expose it here
+    deployment: SdciDeployment | None = None  # set by steps that deploy a service
 
     @abstractmethod
     def is_satisfied(self) -> bool:
@@ -222,7 +223,12 @@ class SdciConfigStep(SetupStep):
             )
         token = self._token_factory()
         self._sdci.setup(ip, token, self._paths.uploads, self._paths.tasks, self._user)
-        self.token = token
+        self.deployment = SdciDeployment(
+            base_dir=self._paths.base,
+            tasks_dir=self._paths.tasks,
+            uploads_dir=self._paths.uploads,
+            token=token,
+        )
 
 
 class SdciDirsStep(SetupStep):

@@ -5,7 +5,7 @@ from io import StringIO
 
 from rich.console import Console
 
-from fonfon.models_setup import SetupReport, SetupStatus, StepResult
+from fonfon.models_setup import SdciDeployment, SetupReport, SetupStatus, StepResult
 from fonfon.output import setup_console, setup_json
 
 
@@ -50,14 +50,19 @@ def test_render_step_start_includes_title():
     assert "Docker" in buf.getvalue()
 
 
-def _report_with_token():
+def _report_with_deployment():
     return SetupReport(
         steps=[
             StepResult(
                 title="sdci config",
                 status=SetupStatus.INSTALLED,
                 detail="installed",
-                token="T" * 42,
+                deployment=SdciDeployment(
+                    base_dir="/home/p/services/sdci",
+                    tasks_dir="/home/p/services/sdci/tasks",
+                    uploads_dir="/home/p/services/sdci/uploads",
+                    token="T" * 42,
+                ),
             ),
         ]
     )
@@ -71,21 +76,23 @@ def _render_summary(report):
     return buf.getvalue()
 
 
-def test_console_summary_prints_token_when_present():
-    out = _render_summary(_report_with_token())
-    assert "sdci token" in out
+def test_console_summary_renders_deployment_panel():
+    out = _render_summary(_report_with_deployment())
+    assert "sdci-server deployed" in out
+    assert "/home/p/services/sdci/tasks" in out
+    assert "/home/p/services/sdci/uploads" in out
     assert "T" * 42 in out
 
 
-def test_console_summary_omits_token_when_absent():
+def test_console_summary_no_panel_without_deployment():
     out = _render_summary(_report())
-    assert "sdci token" not in out
+    assert "sdci-server deployed" not in out
 
 
-def test_json_includes_token_field():
+def test_json_includes_deployment_field():
     buf = StringIO()
     setup_json.render(
-        _report_with_token(), Console(file=buf, force_terminal=False, width=100)
+        _report_with_deployment(), Console(file=buf, force_terminal=False, width=100)
     )
     data = json_module.loads(buf.getvalue())
-    assert data["steps"][0]["token"] == "T" * 42
+    assert data["steps"][0]["deployment"]["token"] == "T" * 42

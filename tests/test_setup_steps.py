@@ -347,7 +347,7 @@ def test_sdci_config_not_satisfied_when_unconfigured():
     assert step.is_satisfied() is False
 
 
-def test_sdci_config_apply_configures_with_dirs_and_user():
+def test_sdci_config_apply_configures_and_sets_deployment():
     ts = FakeTailscale(ip="100.64.0.1")
     sdci = FakeSdci()
     step = SdciConfigStep(
@@ -361,7 +361,10 @@ def test_sdci_config_apply_configures_with_dirs_and_user():
         PATHS.tasks,
         "preludian",
     )
-    assert step.token == "T" * 42
+    assert step.deployment.base_dir == PATHS.base
+    assert step.deployment.tasks_dir == PATHS.tasks
+    assert step.deployment.uploads_dir == PATHS.uploads
+    assert step.deployment.token == "T" * 42
 
 
 def test_sdci_config_apply_raises_without_ip():

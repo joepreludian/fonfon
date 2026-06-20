@@ -1,4 +1,4 @@
-from fonfon.models_setup import SetupReport, SetupStatus, StepResult
+from fonfon.models_setup import SdciDeployment, SetupReport, SetupStatus, StepResult
 
 
 def _report(*statuses):
@@ -20,11 +20,17 @@ def test_ok_false_with_failure():
     assert _report(SetupStatus.INSTALLED, SetupStatus.FAILED).ok is False
 
 
-def test_step_result_token_defaults_none():
+def test_step_result_deployment_defaults_none():
     r = StepResult(title="x", status=SetupStatus.SKIPPED)
-    assert r.token is None
+    assert r.deployment is None
 
 
-def test_step_result_token_roundtrips_in_dump():
-    r = StepResult(title="sdci config", status=SetupStatus.INSTALLED, token="abc123")
-    assert r.model_dump()["token"] == "abc123"
+def test_step_result_deployment_roundtrips_in_dump():
+    r = StepResult(
+        title="sdci config",
+        status=SetupStatus.INSTALLED,
+        deployment=SdciDeployment(
+            base_dir="b", tasks_dir="t", uploads_dir="u", token="abc"
+        ),
+    )
+    assert r.model_dump()["deployment"]["token"] == "abc"

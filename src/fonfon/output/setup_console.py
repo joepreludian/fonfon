@@ -1,9 +1,11 @@
 """Console renderer for SetupReport — rich colored output with header and summary."""
 
 from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 from fonfon import get_version
-from fonfon.models_setup import SetupReport, SetupStatus, StepResult
+from fonfon.models_setup import SdciDeployment, SetupReport, SetupStatus, StepResult
 from fonfon.services.setup_steps import SetupStep
 from fonfon.ui import build_action_box, build_header
 
@@ -36,6 +38,17 @@ def render_step(result: StepResult, console: Console) -> None:
     console.print(f"  {result.title:<14} [{style}]{label}[/{style}]  {detail}")
 
 
+def _deployment_panel(deployment: SdciDeployment) -> Panel:
+    table = Table.grid(padding=(0, 2))
+    table.add_column(style="bold")
+    table.add_column()
+    table.add_row("project", deployment.base_dir)
+    table.add_row("tasks", deployment.tasks_dir)
+    table.add_row("uploads", deployment.uploads_dir)
+    table.add_row("token", deployment.token)
+    return Panel.fit(table, title="sdci-server deployed", border_style="green")
+
+
 def render_summary(report: SetupReport, console: Console) -> None:
     """Print the counts footer and, if one was generated, the sdci token."""
     installed = sum(1 for s in report.steps if s.status is SetupStatus.INSTALLED)
@@ -46,11 +59,9 @@ def render_summary(report: SetupReport, console: Console) -> None:
         f"[dim]{skipped} skipped[/dim] · "
         f"[red]{failed} failed[/red]"
     )
-    token = next((s.token for s in report.steps if s.token), None)
-    if token:
-        console.print(
-            f"[bold]sdci token:[/bold] {token}  [dim](stored in /etc/sdci/config)[/dim]"
-        )
+    deployment = next((s.deployment for s in report.steps if s.deployment), None)
+    if deployment:
+        console.print(_deployment_panel(deployment))
 
 
 def render(report: SetupReport, console: Console) -> None:

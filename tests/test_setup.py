@@ -1,6 +1,6 @@
 """Tests for the run_setup use-case and its policy."""
 
-from fonfon.models_setup import SetupStatus
+from fonfon.models_setup import SdciDeployment, SetupStatus
 from fonfon.services.setup import build_steps, run_setup, run_step
 from fonfon.services.setup_steps import SetupStep
 
@@ -80,24 +80,25 @@ def test_run_setup_on_step_start_called_before_on_result(monkeypatch):
     assert events == [("start", "A"), ("result", "A")]
 
 
-def test_run_step_propagates_token_from_step():
-    class TokenStep(SetupStep):
+def test_run_step_propagates_deployment_from_step():
+    class DeployStep(SetupStep):
         title = "T"
 
         def is_satisfied(self):
             return False
 
         def apply(self):
-            self.token = "abc123"
+            self.deployment = SdciDeployment(
+                base_dir="b", tasks_dir="t", uploads_dir="u", token="abc"
+            )
 
-    r = run_step(TokenStep())
+    r = run_step(DeployStep())
     assert r.status is SetupStatus.INSTALLED
-    assert r.token == "abc123"
+    assert r.deployment.token == "abc"
 
 
-def test_run_step_token_none_for_plain_step():
-    r = run_step(FakeStep("X"))
-    assert r.token is None
+def test_run_step_deployment_none_for_plain_step():
+    assert run_step(FakeStep("X")).deployment is None
 
 
 def test_build_steps_with_auth_key_appends_service_steps():

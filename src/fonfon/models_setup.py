@@ -11,11 +11,18 @@ class SetupStatus(StrEnum):
     FAILED = "failed"
 
 
+class SdciDeployment(BaseModel):
+    base_dir: str
+    tasks_dir: str
+    uploads_dir: str
+    token: str
+
+
 class StepResult(BaseModel):
     title: str
     status: SetupStatus
     detail: str | None = None
-    token: str | None = None
+    deployment: SdciDeployment | None = None
 
 
 class SetupReport(BaseModel):
