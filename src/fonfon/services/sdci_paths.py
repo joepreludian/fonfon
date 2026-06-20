@@ -4,6 +4,8 @@ from pydantic import BaseModel
 
 
 class SdciPaths(BaseModel):
+    """Paths for the sdci service-directory tree under a user's home."""
+
     base: str
     tasks: str
     uploads: str

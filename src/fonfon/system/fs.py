@@ -22,4 +22,6 @@ class Fs:
         proc = self._run(["install", "-d", "-o", owner, "-g", owner, "-m", mode, path])
         if proc.returncode != 0:
             detail = proc.stderr.strip() or proc.stdout.strip()
-            raise RuntimeError(f"mkdir {path} failed (rc {proc.returncode}): {detail}")
+            raise RuntimeError(
+                f"install -d {path} failed (rc {proc.returncode}): {detail}"
+            )
