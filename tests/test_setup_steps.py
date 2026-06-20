@@ -2,6 +2,7 @@
 
 import pytest
 
+from fonfon.services.sdci_paths import sdci_paths
 from fonfon.services.setup_steps import (
     DOCKER_GPG_URL,
     DOCKER_KEYRING,
@@ -12,6 +13,7 @@ from fonfon.services.setup_steps import (
     DockerStep,
     PipxStep,
     SdciConfigStep,
+    SdciDirsStep,
     SdciStep,
     TailscaleStep,
     TailscaleUpStep,
@@ -351,3 +353,41 @@ def test_sdci_config_apply_raises_without_ip():
     )
     with pytest.raises(RuntimeError):
         step.apply()
+
+
+# ── SdciDirsStep ─────────────────────────────────────────────────────────────
+
+
+class FakeFs:
+    def __init__(self, existing=()):
+        self._existing = set(existing)
+        self.made = []
+
+    def exists(self, path):
+        return path in self._existing
+
+    def make_dir(self, path, owner, mode):
+        self.made.append((path, owner, mode))
+        self._existing.add(path)
+
+
+def test_sdci_dirs_satisfied_when_dirs_exist():
+    paths = sdci_paths("preludian")
+    fs = FakeFs(existing=(paths.tasks, paths.uploads))
+    assert SdciDirsStep("preludian", paths, fs=fs).is_satisfied() is True
+
+
+def test_sdci_dirs_not_satisfied_when_missing():
+    paths = sdci_paths("preludian")
+    assert SdciDirsStep("preludian", paths, fs=FakeFs()).is_satisfied() is False
+
+
+def test_sdci_dirs_apply_creates_base_tasks_uploads_owned_0700():
+    paths = sdci_paths("preludian")
+    fs = FakeFs()
+    SdciDirsStep("preludian", paths, fs=fs).apply()
+    assert fs.made == [
+        (paths.base, "preludian", "0700"),
+        (paths.tasks, "preludian", "0700"),
+        (paths.uploads, "preludian", "0700"),
+    ]

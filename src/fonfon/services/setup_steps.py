@@ -3,11 +3,13 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 
+from fonfon.services.sdci_paths import SdciPaths
 from fonfon.services.token import generate_token
 from fonfon.system import probes
 from fonfon.system._run import run as _default_run
 from fonfon.system.apt import Apt
 from fonfon.system.dpkg import Dpkg
+from fonfon.system.fs import Fs
 from fonfon.system.pipx import Pipx
 from fonfon.system.sdci import Sdci
 from fonfon.system.tailscale import Tailscale
@@ -15,6 +17,7 @@ from fonfon.system.users import Users
 
 SDCI_PACKAGE = "sdci"
 SDCI_EXECUTABLE = "sdci-server"
+SDCI_DIR_MODE = "0700"
 
 DOCKER_PACKAGES = [
     "docker-ce",
@@ -216,3 +219,23 @@ class SdciConfigStep(SetupStep):
         token = self._token_factory()
         self._sdci.setup(ip, token)
         self.token = token
+
+
+class SdciDirsStep(SetupStep):
+    """Create the operator's sdci service directories (tasks, uploads)."""
+
+    title = "sdci dirs"
+
+    def __init__(self, user: str, paths: SdciPaths, fs: Fs | None = None) -> None:
+        self._user = user
+        self._paths = paths
+        self._fs = fs or Fs()
+
+    def is_satisfied(self) -> bool:
+        return self._fs.exists(self._paths.tasks) and self._fs.exists(
+            self._paths.uploads
+        )
+
+    def apply(self) -> None:
+        for path in (self._paths.base, self._paths.tasks, self._paths.uploads):
+            self._fs.make_dir(path, self._user, SDCI_DIR_MODE)
