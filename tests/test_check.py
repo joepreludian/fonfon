@@ -142,5 +142,5 @@ def test_unsupported_distro_still_includes_sdci_item():
     assert pkgs["sdci"].status is CheckStatus.OK
 
 
-def test_services_list_includes_sdci_server():
-    assert "sdci-server" in SERVICES
+def test_services_list_includes_sdci():
+    assert "sdci" in SERVICES

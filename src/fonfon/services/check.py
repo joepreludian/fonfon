@@ -13,7 +13,7 @@ from fonfon.services.systemd_service import ServicesReport, SystemdService
 from fonfon.system.pipx import Pipx
 
 PACKAGES = ["sudo", "docker-ce", "tailscale", "pipx"]
-SERVICES = ["docker", "ssh", "tailscaled", "sdci-server"]
+SERVICES = ["docker", "ssh", "tailscaled", "sdci"]
 TRAEFIK_PORTS = [80, 443]
 
 
