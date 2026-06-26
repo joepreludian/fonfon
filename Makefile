@@ -12,7 +12,7 @@ NAME := fonfon
 ARCH ?= aarch64
 
 .DEFAULT_GOAL := build
-.PHONY: build clean test test-integration debian-login debian-destroy debian-demo
+.PHONY: build clean test test-integration debian-login debian-deploy debian-destroy debian-demo
 
 # pydantic-core ships per-platform wheels, so each --scie-platform (which picks the
 # embedded interpreter) is paired with a --platform (which picks the wheel target) so
@@ -38,6 +38,9 @@ test-integration: ## Boot a Debian VM and run the integration suite (ARCH=aarch6
 
 debian-login: ## Build the scie, boot/reuse a Debian VM with fonfon on PATH, and open a shell (ARCH=aarch64|x86_64)
 	ARCH=$(ARCH) bash tools/debian-dev.sh login
+
+debian-deploy: ## Rebuild the scie and copy it onto the already-running dev VM (ARCH=aarch64|x86_64)
+	ARCH=$(ARCH) bash tools/debian-dev.sh deploy
 
 debian-destroy: ## Stop and delete the Debian dev VM
 	ARCH=$(ARCH) bash tools/debian-dev.sh destroy

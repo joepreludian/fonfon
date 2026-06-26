@@ -7,6 +7,9 @@
 # and drops you into a shell. Exiting the shell leaves the VM running so you can
 # log back in; `destroy` stops and deletes it.
 #
+# `deploy` rebuilds the scie and copies it onto the already-running VM (no
+# recreate, no shell) -- the quick "I changed the code, push it to the VM" loop.
+#
 # `demo` runs a full end-to-end on a FRESH VM: build, recreate, install, then
 # `fonfon check` followed by `fonfon setup preludian`. Set TAILSCALE_AUTH_KEY in
 # the environment to also join the tailnet and configure sdci; without it the
@@ -15,10 +18,12 @@
 # Usage:
 #   tools/debian-dev.sh login              # aarch64 (default)
 #   ARCH=x86_64 tools/debian-dev.sh login  # emulated x86_64
+#   tools/debian-dev.sh deploy             # rebuild + copy onto the running VM
 #   tools/debian-dev.sh destroy
 #   tools/debian-dev.sh demo
 #
-# Normally invoked via `make debian-login` / `make debian-destroy` / `make debian-demo`.
+# Normally invoked via `make debian-login` / `make debian-deploy` /
+# `make debian-destroy` / `make debian-demo`.
 set -euo pipefail
 
 ARCH="${ARCH:-aarch64}"
@@ -112,6 +117,27 @@ EOF
   limactl shell "${VM_NAME}"
 }
 
+# Rebuild the scie and copy it onto the already-running VM. Assumes the VM
+# exists and is running (e.g. after `make debian-login`); errors fast otherwise.
+cmd_deploy() {
+  require_lima
+  check_arch
+
+  local status
+  status="$(vm_status)"
+  if [[ "${status}" != "Running" ]]; then
+    echo "error: VM '${VM_NAME}' is not running (status: ${status:-absent})." >&2
+    echo "Start it first with:  make debian-login" >&2
+    exit 1
+  fi
+
+  build_scie
+  inject_scie
+
+  echo ">> Deployed fresh fonfon to '${VM_NAME}:${SCIE_IN_VM}'. Check it with:"
+  echo ">>     limactl shell ${VM_NAME} -- fonfon --version"
+}
+
 cmd_destroy() {
   require_lima
   echo ">> Stopping and deleting VM '${VM_NAME}' ..."
@@ -143,7 +169,7 @@ cmd_demo() {
   echo ">> Running 'fonfon setup ${DEMO_USER}' ..."
   if [[ -n "${TAILSCALE_AUTH_KEY:-}" ]]; then
     limactl shell "${VM_NAME}" -- sudo "${SCIE_IN_VM}" \
-      setup "${DEMO_USER}" --tailscale-auth-key "${TAILSCALE_AUTH_KEY}"
+      setup "${DEMO_USER}" --tailscale-key "${TAILSCALE_AUTH_KEY}"
   else
     echo ">> No TAILSCALE_AUTH_KEY in env -- setup will stop at the required-key gate (demo)."
     limactl shell "${VM_NAME}" -- sudo "${SCIE_IN_VM}" setup "${DEMO_USER}" || true
@@ -154,10 +180,11 @@ cmd_demo() {
 
 case "${1:-}" in
   login) cmd_login ;;
+  deploy) cmd_deploy ;;
   destroy) cmd_destroy ;;
   demo) cmd_demo ;;
   *)
-    echo "usage: $0 {login|destroy|demo}" >&2
+    echo "usage: $0 {login|deploy|destroy|demo}" >&2
     exit 2
     ;;
 esac
