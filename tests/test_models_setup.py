@@ -2,6 +2,7 @@ from fonfon.models_setup import (
     SdciDeployment,
     SetupReport,
     SetupStatus,
+    SshDeployment,
     StepResult,
     TraefikDeployment,
 )
@@ -63,3 +64,25 @@ def test_step_result_accepts_traefik_deployment():
     result = StepResult(title="Traefik", status=SetupStatus.INSTALLED, deployment=dep)
     assert isinstance(result.deployment, TraefikDeployment)
     assert result.deployment.network == "traefik"
+
+
+def test_ssh_deployment_fields():
+    dep = SshDeployment(
+        dropin_file="/etc/ssh/sshd_config.d/99-fonfon-hardening.conf",
+        authorized_keys="/home/deploy/.ssh/authorized_keys",
+        github_user="octocat",
+        reload_hint="sudo systemctl reload ssh",
+    )
+    assert dep.github_user == "octocat"
+    assert dep.dropin_file.endswith("99-fonfon-hardening.conf")
+
+
+def test_step_result_accepts_ssh_deployment():
+    dep = SshDeployment(
+        dropin_file="d", authorized_keys="a", github_user="octocat", reload_hint="r"
+    )
+    result = StepResult(
+        title="SSH hardening", status=SetupStatus.INSTALLED, deployment=dep
+    )
+    assert isinstance(result.deployment, SshDeployment)
+    assert result.deployment.github_user == "octocat"

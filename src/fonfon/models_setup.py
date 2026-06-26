@@ -25,11 +25,18 @@ class TraefikDeployment(BaseModel):
     cert_email: str
 
 
+class SshDeployment(BaseModel):
+    dropin_file: str
+    authorized_keys: str
+    github_user: str
+    reload_hint: str
+
+
 class StepResult(BaseModel):
     title: str
     status: SetupStatus
     detail: str | None = None
-    deployment: SdciDeployment | TraefikDeployment | None = None
+    deployment: SdciDeployment | TraefikDeployment | SshDeployment | None = None
 
 
 class SetupReport(BaseModel):
