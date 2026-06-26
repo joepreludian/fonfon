@@ -21,3 +21,14 @@ class DockerCli:
             return None
         data = json.loads(proc.stdout or "[]")
         return data[0] if data else None
+
+    def network_exists(self, name: str) -> bool:
+        return self._run(["docker", "network", "inspect", name]).returncode == 0
+
+    def create_network(self, name: str) -> None:
+        proc = self._run(["docker", "network", "create", name])
+        if proc.returncode != 0:
+            detail = proc.stderr.strip() or proc.stdout.strip()
+            raise RuntimeError(
+                f"docker network create {name} failed (rc {proc.returncode}): {detail}"
+            )

@@ -1,3 +1,5 @@
+import pytest
+
 from fonfon.system.docker_cli import DockerCli
 from tests.fakes import completed
 
@@ -19,3 +21,32 @@ def test_inspect_container_parses_json():
     docker = DockerCli(run=lambda args, timeout=10: completed(args, 0, payload))
     data = docker.inspect_container("traefik")
     assert data["Name"] == "/traefik"
+
+
+def test_network_exists_true_on_zero_exit():
+    docker = DockerCli(run=lambda args, timeout=10: completed(args, 0, "[]"))
+    assert docker.network_exists("traefik") is True
+
+
+def test_network_exists_false_on_nonzero_exit():
+    docker = DockerCli(
+        run=lambda args, timeout=10: completed(args, 1, "", "No such network")
+    )
+    assert docker.network_exists("traefik") is False
+
+
+def test_create_network_runs_docker_network_create():
+    seen = {}
+
+    def run(args, timeout=10):
+        seen["args"] = args
+        return completed(args, 0, "abc123")
+
+    DockerCli(run=run).create_network("traefik")
+    assert seen["args"] == ["docker", "network", "create", "traefik"]
+
+
+def test_create_network_raises_on_failure():
+    docker = DockerCli(run=lambda args, timeout=10: completed(args, 1, "", "boom"))
+    with pytest.raises(RuntimeError, match="boom"):
+        docker.create_network("traefik")
