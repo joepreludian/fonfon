@@ -18,11 +18,18 @@ class SdciDeployment(BaseModel):
     token: str
 
 
+class TraefikDeployment(BaseModel):
+    compose_file: str
+    network: str
+    dashboard_url: str
+    cert_email: str
+
+
 class StepResult(BaseModel):
     title: str
     status: SetupStatus
     detail: str | None = None
-    deployment: SdciDeployment | None = None
+    deployment: SdciDeployment | TraefikDeployment | None = None
 
 
 class SetupReport(BaseModel):

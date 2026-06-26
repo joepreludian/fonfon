@@ -1,4 +1,10 @@
-from fonfon.models_setup import SdciDeployment, SetupReport, SetupStatus, StepResult
+from fonfon.models_setup import (
+    SdciDeployment,
+    SetupReport,
+    SetupStatus,
+    StepResult,
+    TraefikDeployment,
+)
 
 
 def _report(*statuses):
@@ -34,3 +40,26 @@ def test_step_result_deployment_roundtrips_in_dump():
         ),
     )
     assert r.model_dump()["deployment"]["token"] == "abc"
+
+
+def test_traefik_deployment_fields():
+    dep = TraefikDeployment(
+        compose_file="/home/deploy/services/traefik/docker-compose.yml",
+        network="traefik",
+        dashboard_url="http://100.64.0.1:8080/dashboard/",
+        cert_email="you@example.com",
+    )
+    assert dep.network == "traefik"
+    assert dep.dashboard_url == "http://100.64.0.1:8080/dashboard/"
+
+
+def test_step_result_accepts_traefik_deployment():
+    dep = TraefikDeployment(
+        compose_file="c",
+        network="traefik",
+        dashboard_url="u",
+        cert_email="e",
+    )
+    result = StepResult(title="Traefik", status=SetupStatus.INSTALLED, deployment=dep)
+    assert isinstance(result.deployment, TraefikDeployment)
+    assert result.deployment.network == "traefik"
