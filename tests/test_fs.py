@@ -65,3 +65,8 @@ def test_write_file_raises_when_chown_fails():
     fs = Fs(run=run, write_text=lambda p, c: None)
     with pytest.raises(RuntimeError, match="chown"):
         fs.write_file("/x", "c", "deploy", "0644")
+
+
+def test_read_text_returns_file_contents():
+    fs = Fs(read_text=lambda path: "data" if path == "/x" else "")
+    assert fs.read_text("/x") == "data"

@@ -11,19 +11,28 @@ def _default_write_text(path: str, content: str) -> None:
     pathlib.Path(path).write_text(content)
 
 
+def _default_read_text(path: str) -> str:
+    return pathlib.Path(path).read_text()
+
+
 class Fs:
     def __init__(
         self,
         run: Callable = _default_run,
         exists: Callable[[str], bool] = os.path.exists,
         write_text: Callable[[str, str], None] = _default_write_text,
+        read_text: Callable[[str], str] = _default_read_text,
     ):
         self._run = run
         self._exists = exists
         self._write_text = write_text
+        self._read_text = read_text
 
     def exists(self, path: str) -> bool:
         return self._exists(path)
+
+    def read_text(self, path: str) -> str:
+        return self._read_text(path)
 
     def make_dir(self, path: str, owner: str, mode: str) -> None:
         proc = self._run(["install", "-d", "-o", owner, "-g", owner, "-m", mode, path])
