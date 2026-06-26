@@ -7,7 +7,7 @@ from click.testing import CliRunner
 from fonfon.cli import main
 from fonfon.models_setup import SetupReport, SetupStatus, StepResult
 
-_KEY = ["--tailscale-auth-key", "tskey-test"]
+_KEY = ["--tailscale-key", "tskey-test"]
 
 
 def _ok_report():
@@ -38,7 +38,7 @@ def test_setup_requires_auth_key(monkeypatch):
 
     monkeypatch.setattr("fonfon.cli.run_setup", _spy)
     result = CliRunner().invoke(
-        main, ["setup", "jon"], env={"FONFON_TAILSCALE_AUTH_KEY": ""}
+        main, ["setup", "jon"], env={"FONFON_TAILSCALE_KEY": ""}
     )
     assert result.exit_code == 1
     assert "auth key" in result.output.lower()
@@ -72,6 +72,6 @@ def test_setup_accepts_key_from_env(monkeypatch):
     monkeypatch.setattr("fonfon.cli.os.geteuid", lambda: 0)
     _patch_run_setup(monkeypatch, _ok_report())
     result = CliRunner().invoke(
-        main, ["setup", "jon"], env={"FONFON_TAILSCALE_AUTH_KEY": "tskey-env"}
+        main, ["setup", "jon"], env={"FONFON_TAILSCALE_KEY": "tskey-env"}
     )
     assert result.exit_code == 0
