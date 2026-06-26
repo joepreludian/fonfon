@@ -5,7 +5,13 @@ from rich.panel import Panel
 from rich.table import Table
 
 from fonfon import get_version
-from fonfon.models_setup import SdciDeployment, SetupReport, SetupStatus, StepResult
+from fonfon.models_setup import (
+    SdciDeployment,
+    SetupReport,
+    SetupStatus,
+    StepResult,
+    TraefikDeployment,
+)
 from fonfon.services.setup_steps import SetupStep
 from fonfon.ui import build_action_box, build_header
 
@@ -50,9 +56,20 @@ def _deployment_panel(deployment: SdciDeployment) -> Panel:
     return Panel.fit(table, title="sdci-server deployed", border_style="green")
 
 
+def _traefik_panel(deployment: TraefikDeployment) -> Panel:
+    """Return a Panel summarising the Traefik deployment."""
+    table = Table.grid(padding=(0, 2))
+    table.add_column(style="bold")
+    table.add_column()
+    table.add_row("compose", deployment.compose_file)
+    table.add_row("network", deployment.network)
+    table.add_row("dashboard", deployment.dashboard_url)
+    table.add_row("cert email", deployment.cert_email)
+    return Panel.fit(table, title="Traefik deployed", border_style="green")
+
+
 def render_summary(report: SetupReport, console: Console) -> None:
-    """Print the counts footer and, if sdci-server was deployed, a panel of its
-    directories and token."""
+    """Print the counts footer and a panel for each deployed service."""
     installed = sum(1 for s in report.steps if s.status is SetupStatus.INSTALLED)
     skipped = sum(1 for s in report.steps if s.status is SetupStatus.SKIPPED)
     failed = sum(1 for s in report.steps if s.status is SetupStatus.FAILED)
@@ -61,9 +78,12 @@ def render_summary(report: SetupReport, console: Console) -> None:
         f"[dim]{skipped} skipped[/dim] · "
         f"[red]{failed} failed[/red]"
     )
-    deployment = next((s.deployment for s in report.steps if s.deployment), None)
-    if deployment:
-        console.print(_deployment_panel(deployment))
+    for step in report.steps:
+        deployment = step.deployment
+        if isinstance(deployment, SdciDeployment):
+            console.print(_deployment_panel(deployment))
+        elif isinstance(deployment, TraefikDeployment):
+            console.print(_traefik_panel(deployment))
 
 
 def render(report: SetupReport, console: Console) -> None:

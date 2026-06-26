@@ -5,7 +5,13 @@ from io import StringIO
 
 from rich.console import Console
 
-from fonfon.models_setup import SdciDeployment, SetupReport, SetupStatus, StepResult
+from fonfon.models_setup import (
+    SdciDeployment,
+    SetupReport,
+    SetupStatus,
+    StepResult,
+    TraefikDeployment,
+)
 from fonfon.output import setup_console, setup_json
 
 
@@ -97,3 +103,39 @@ def test_json_includes_deployment_field():
     )
     data = json_module.loads(buf.getvalue())
     assert data["steps"][0]["deployment"]["token"] == "T" * 42
+
+
+def _report_with_traefik():
+    return SetupReport(
+        steps=[
+            StepResult(
+                title="Traefik",
+                status=SetupStatus.INSTALLED,
+                detail="installed",
+                deployment=TraefikDeployment(
+                    compose_file="/home/p/services/traefik/docker-compose.yml",
+                    network="traefik",
+                    dashboard_url="http://100.64.0.1:8080/dashboard/",
+                    cert_email="you@example.com",
+                ),
+            ),
+        ]
+    )
+
+
+def test_console_summary_renders_traefik_panel():
+    out = _render_summary(_report_with_traefik())
+    assert "Traefik deployed" in out
+    assert "/home/p/services/traefik/docker-compose.yml" in out
+    assert "traefik" in out
+    assert "http://100.64.0.1:8080/dashboard/" in out
+    assert "you@example.com" in out
+
+
+def test_console_summary_renders_both_panels():
+    report = SetupReport(
+        steps=_report_with_deployment().steps + _report_with_traefik().steps
+    )
+    out = _render_summary(report)
+    assert "sdci-server deployed" in out
+    assert "Traefik deployed" in out
