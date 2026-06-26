@@ -3,12 +3,20 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 
-from fonfon.models_setup import SdciDeployment
+from fonfon.models_setup import SdciDeployment, TraefikDeployment
 from fonfon.services.sdci_paths import SdciPaths
 from fonfon.services.token import generate_token
+from fonfon.services.traefik_config import (
+    TRAEFIK_NETWORK,
+    render_compose,
+    render_static_config,
+)
+from fonfon.services.traefik_paths import TraefikPaths
 from fonfon.system import probes
 from fonfon.system._run import run as _default_run
 from fonfon.system.apt import Apt
+from fonfon.system.docker_cli import DockerCli
+from fonfon.system.docker_compose import DockerCompose
 from fonfon.system.dpkg import Dpkg
 from fonfon.system.fs import Fs
 from fonfon.system.pipx import Pipx
@@ -19,6 +27,9 @@ from fonfon.system.users import Users
 SDCI_PACKAGE = "sdci"
 SDCI_EXECUTABLE = "sdci-server"
 SDCI_DIR_MODE = "0700"
+
+TRAEFIK_DIR_MODE = "0700"
+TRAEFIK_FILE_MODE = "0644"
 
 DOCKER_PACKAGES = [
     "docker-ce",
@@ -37,7 +48,9 @@ class SetupStep(ABC):
     """Base class for an idempotent provisioning action."""
 
     title: str
-    deployment: SdciDeployment | None = None  # set by steps that deploy a service
+    deployment: SdciDeployment | TraefikDeployment | None = (
+        None  # set by steps that deploy a service
+    )
 
     @abstractmethod
     def is_satisfied(self) -> bool:
@@ -249,3 +262,94 @@ class SdciDirsStep(SetupStep):
     def apply(self) -> None:
         for path in (self._paths.base, self._paths.tasks, self._paths.uploads):
             self._fs.make_dir(path, self._user, SDCI_DIR_MODE)
+
+
+class TraefikDirsStep(SetupStep):
+    """Create the operator's Traefik service directories (base, acme, dynamic)."""
+
+    title = "Traefik dirs"
+
+    def __init__(self, user: str, paths: TraefikPaths, fs: Fs | None = None) -> None:
+        self._user = user
+        self._paths = paths
+        self._fs = fs or Fs()
+
+    def is_satisfied(self) -> bool:
+        return (
+            self._fs.exists(self._paths.base)
+            and self._fs.exists(self._paths.acme)
+            and self._fs.exists(self._paths.dynamic)
+        )
+
+    def apply(self) -> None:
+        for path in (self._paths.base, self._paths.acme, self._paths.dynamic):
+            self._fs.make_dir(path, self._user, TRAEFIK_DIR_MODE)
+
+
+class TraefikNetworkStep(SetupStep):
+    """Create the external `traefik` Docker network."""
+
+    title = "Traefik network"
+
+    def __init__(self, docker: DockerCli | None = None) -> None:
+        self._docker = docker or DockerCli()
+
+    def is_satisfied(self) -> bool:
+        return self._docker.network_exists(TRAEFIK_NETWORK)
+
+    def apply(self) -> None:
+        self._docker.create_network(TRAEFIK_NETWORK)
+
+
+class TraefikStep(SetupStep):
+    """Write Traefik's config + compose file and bring the stack up."""
+
+    title = "Traefik"
+
+    def __init__(
+        self,
+        user: str,
+        paths: TraefikPaths,
+        cert_email: str,
+        tailscale: Tailscale | None = None,
+        docker: DockerCli | None = None,
+        compose: DockerCompose | None = None,
+        fs: Fs | None = None,
+    ) -> None:
+        self._user = user
+        self._paths = paths
+        self._cert_email = cert_email
+        self._tailscale = tailscale or Tailscale()
+        self._docker = docker or DockerCli()
+        self._compose = compose or DockerCompose()
+        self._fs = fs or Fs()
+
+    def is_satisfied(self) -> bool:
+        inspect = self._docker.inspect_container("traefik")
+        return bool(inspect and inspect.get("State", {}).get("Running"))
+
+    def apply(self) -> None:
+        ip = self._tailscale.ipv4()
+        if ip is None:
+            raise RuntimeError(
+                "no Tailscale IPv4 available; is `tailscale up` complete?"
+            )
+        self._fs.write_file(
+            self._paths.static_config,
+            render_static_config(self._cert_email),
+            self._user,
+            TRAEFIK_FILE_MODE,
+        )
+        self._fs.write_file(
+            self._paths.compose_file,
+            render_compose(ip, self._paths),
+            self._user,
+            TRAEFIK_FILE_MODE,
+        )
+        self._compose.up(self._paths.compose_file)
+        self.deployment = TraefikDeployment(
+            compose_file=self._paths.compose_file,
+            network=TRAEFIK_NETWORK,
+            dashboard_url=f"http://{ip}:8080/dashboard/",
+            cert_email=self._cert_email,
+        )

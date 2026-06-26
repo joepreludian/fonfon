@@ -17,8 +17,13 @@ from fonfon.services.setup_steps import (
     SdciStep,
     TailscaleStep,
     TailscaleUpStep,
+    TraefikDirsStep,
+    TraefikNetworkStep,
+    TraefikStep,
     UserStep,
 )
+from fonfon.services.traefik_config import TRAEFIK_IMAGE, TRAEFIK_NETWORK
+from fonfon.services.traefik_paths import traefik_paths
 from fonfon.system.dpkg import PackageState
 from tests.fakes import completed
 
@@ -386,12 +391,17 @@ class FakeFs:
     def __init__(self, existing=()):
         self._existing = set(existing)
         self.made = []
+        self.writes = []
 
     def exists(self, path):
         return path in self._existing
 
     def make_dir(self, path, owner, mode):
         self.made.append((path, owner, mode))
+        self._existing.add(path)
+
+    def write_file(self, path, content, owner, mode):
+        self.writes.append((path, content, owner, mode))
         self._existing.add(path)
 
 
@@ -415,3 +425,140 @@ def test_sdci_dirs_apply_creates_base_tasks_uploads_owned_0700():
         (paths.tasks, "preludian", "0700"),
         (paths.uploads, "preludian", "0700"),
     ]
+
+
+# ── Traefik steps ──────────────────────────────────────────────────────────────
+
+
+class FakeDockerCli:
+    def __init__(self, networks=(), container=None):
+        self._networks = set(networks)
+        self._container = container
+        self.created = []
+
+    def network_exists(self, name):
+        return name in self._networks
+
+    def create_network(self, name):
+        self.created.append(name)
+        self._networks.add(name)
+
+    def inspect_container(self, name):
+        return self._container
+
+
+class FakeCompose:
+    def __init__(self):
+        self.upped = []
+
+    def up(self, compose_file):
+        self.upped.append(compose_file)
+
+
+TPATHS = traefik_paths("deploy")
+
+
+def test_traefik_dirs_satisfied_when_all_exist():
+    fs = FakeFs(existing=(TPATHS.base, TPATHS.acme, TPATHS.dynamic))
+    assert TraefikDirsStep("deploy", TPATHS, fs=fs).is_satisfied() is True
+
+
+def test_traefik_dirs_not_satisfied_when_any_missing():
+    fs = FakeFs(existing=(TPATHS.base, TPATHS.acme))
+    assert TraefikDirsStep("deploy", TPATHS, fs=fs).is_satisfied() is False
+
+
+def test_traefik_dirs_apply_creates_base_acme_dynamic_0700():
+    fs = FakeFs()
+    TraefikDirsStep("deploy", TPATHS, fs=fs).apply()
+    assert fs.made == [
+        (TPATHS.base, "deploy", "0700"),
+        (TPATHS.acme, "deploy", "0700"),
+        (TPATHS.dynamic, "deploy", "0700"),
+    ]
+
+
+def test_traefik_network_satisfied_when_exists():
+    docker = FakeDockerCli(networks=[TRAEFIK_NETWORK])
+    assert TraefikNetworkStep(docker=docker).is_satisfied() is True
+
+
+def test_traefik_network_not_satisfied_when_absent():
+    assert TraefikNetworkStep(docker=FakeDockerCli()).is_satisfied() is False
+
+
+def test_traefik_network_apply_creates_network():
+    docker = FakeDockerCli()
+    TraefikNetworkStep(docker=docker).apply()
+    assert docker.created == [TRAEFIK_NETWORK]
+
+
+def test_traefik_satisfied_when_container_running():
+    docker = FakeDockerCli(container={"State": {"Running": True}})
+    step = TraefikStep("deploy", TPATHS, "you@example.com", docker=docker)
+    assert step.is_satisfied() is True
+
+
+def test_traefik_not_satisfied_when_container_absent_or_stopped():
+    assert (
+        TraefikStep(
+            "deploy", TPATHS, "you@example.com", docker=FakeDockerCli(container=None)
+        ).is_satisfied()
+        is False
+    )
+    stopped = FakeDockerCli(container={"State": {"Running": False}})
+    assert (
+        TraefikStep("deploy", TPATHS, "you@example.com", docker=stopped).is_satisfied()
+        is False
+    )
+
+
+def test_traefik_apply_writes_files_brings_up_and_sets_deployment():
+    fs = FakeFs()
+    docker = FakeDockerCli()
+    compose = FakeCompose()
+    ts = FakeTailscale(ip="100.64.0.1")
+    step = TraefikStep(
+        "deploy",
+        TPATHS,
+        "you@example.com",
+        tailscale=ts,
+        docker=docker,
+        compose=compose,
+        fs=fs,
+    )
+    step.apply()
+
+    # static config written to traefik.yml, compose to docker-compose.yml, 0644
+    written = {path: (content, owner, mode) for path, content, owner, mode in fs.writes}
+    assert TPATHS.static_config in written
+    assert TPATHS.compose_file in written
+    assert written[TPATHS.static_config][1:] == ("deploy", "0644")
+    assert written[TPATHS.compose_file][1:] == ("deploy", "0644")
+    # compose content pins the image and binds the dashboard to the tailnet IP
+    assert TRAEFIK_IMAGE in written[TPATHS.compose_file][0]
+    assert "100.64.0.1:8080:8080" in written[TPATHS.compose_file][0]
+    # static config disables expose-by-default and carries the cert email
+    assert "exposedByDefault: false" in written[TPATHS.static_config][0]
+    assert "you@example.com" in written[TPATHS.static_config][0]
+    # stack brought up
+    assert compose.upped == [TPATHS.compose_file]
+    # deployment surfaced
+    assert step.deployment.network == TRAEFIK_NETWORK
+    assert step.deployment.compose_file == TPATHS.compose_file
+    assert step.deployment.dashboard_url == "http://100.64.0.1:8080/dashboard/"
+    assert step.deployment.cert_email == "you@example.com"
+
+
+def test_traefik_apply_raises_without_ip():
+    step = TraefikStep(
+        "deploy",
+        TPATHS,
+        "you@example.com",
+        tailscale=FakeTailscale(ip=None),
+        docker=FakeDockerCli(),
+        compose=FakeCompose(),
+        fs=FakeFs(),
+    )
+    with pytest.raises(RuntimeError):
+        step.apply()
