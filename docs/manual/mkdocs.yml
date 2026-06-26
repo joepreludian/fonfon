@@ -38,6 +38,8 @@ nav:
   - Commands:
       - check: commands/check.md
       - setup: commands/setup.md
+  - Services:
+      - Traefik: services/traefik.md
 
 markdown_extensions:
   - admonition

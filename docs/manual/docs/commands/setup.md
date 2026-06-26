@@ -13,8 +13,8 @@ tailnet** and **configures `sdci-server`** against the tailnet IP. Each step is
     if run as an unprivileged user.
 
 !!! warning "Requires a Tailscale auth key"
-    `fonfon setup` requires `--tailscale-auth-key` (or the
-    `FONFON_TAILSCALE_AUTH_KEY` environment variable). Without it, setup prints a
+    `fonfon setup` requires `--tailscale-key` (or the
+    `FONFON_TAILSCALE_KEY` environment variable). Without it, setup prints a
     link to the [Tailscale keys page](https://login.tailscale.com/admin/settings/keys)
     and exits non-zero **without making any changes**. Using the environment
     variable keeps the key out of your shell history.
@@ -22,12 +22,24 @@ tailnet** and **configures `sdci-server`** against the tailnet IP. Each step is
 ## Usage
 
 ```bash
-sudo fonfon setup <new_user> --tailscale-auth-key <key>   # rich, colored (default)
-sudo fonfon setup <new_user> --tailscale-auth-key <key> --output json
-FONFON_TAILSCALE_AUTH_KEY=<key> sudo -E fonfon setup <new_user>   # key via env
+sudo fonfon setup <new_user> --tailscale-key <key>   # rich, colored (default)
+sudo fonfon setup <new_user> --tailscale-key <key> --output json
+FONFON_TAILSCALE_KEY=<key> sudo -E fonfon setup <new_user>   # key via env
 ```
 
 `<new_user>` is the name of the operator account to create (e.g. `deploy`).
+
+To also deploy Traefik (reverse proxy with tailnet-only dashboard and Let's
+Encrypt certificates), pass `--traefik-cert-email` (or set
+`FONFON_TRAEFIK_CERT_EMAIL`):
+
+```bash
+sudo fonfon setup deploy --tailscale-key <key> \
+  --traefik-cert-email you@example.com
+```
+
+See [Services → Traefik](../services/traefik.md) for the full model and the
+application label cookbook.
 
 ## Provisioning steps
 
@@ -42,6 +54,9 @@ FONFON_TAILSCALE_AUTH_KEY=<key> sudo -E fonfon setup <new_user>   # key via env
 | 7 | **Tailscale up** | Joins the tailnet with `tailscale up --auth-key <key>`, yielding a `100.x` tailnet IPv4 (skipped if already connected) |
 | 8 | **sdci dirs** | Creates `/home/<user>/services/sdci/{tasks,uploads}`, owned by the operator user, mode `0700` (skipped if they already exist) |
 | 9 | **sdci config** | Generates a random 42-char token and runs `sdci-server setup --ip <tailnet-ip> --token <token> --uploads-dir <…/uploads> --tasks-dir <…/tasks> --user <user>`, so the service runs as the operator user; stores config in `/etc/sdci/config` and registers its own systemd unit (skipped if `/etc/sdci/config` exists) |
+| 10 | **Traefik dirs** | Creates `/home/<user>/services/traefik/{,acme,dynamic}`, owned by the operator, mode `0700` (only when `--traefik-cert-email` is set) |
+| 11 | **Traefik network** | Creates the external `traefik` Docker network so app stacks can attach |
+| 12 | **Traefik** | Writes `docker-compose.yml` (image `traefik:v3.7.5`) + `traefik.yml`, then `docker compose up -d`; dashboard bound to `<tailnet-ip>:8080`, ACME HTTP-01 resolver `le` |
 
 ## Idempotency and error handling
 
