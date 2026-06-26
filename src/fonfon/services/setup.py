@@ -14,10 +14,16 @@ from fonfon.services.setup_steps import (
     SetupStep,
     TailscaleStep,
     TailscaleUpStep,
+    TraefikDirsStep,
+    TraefikNetworkStep,
+    TraefikStep,
     UserStep,
 )
+from fonfon.services.traefik_paths import traefik_paths
 from fonfon.system._run import run as _default_run
 from fonfon.system.apt import Apt
+from fonfon.system.docker_cli import DockerCli
+from fonfon.system.docker_compose import DockerCompose
 from fonfon.system.dpkg import Dpkg
 from fonfon.system.fs import Fs
 from fonfon.system.pipx import Pipx
@@ -27,12 +33,16 @@ from fonfon.system.users import Users
 
 
 def build_steps(
-    new_user: str, auth_key: str | None = None, run: Callable = _default_run
+    new_user: str,
+    auth_key: str | None = None,
+    cert_email: str | None = None,
+    run: Callable = _default_run,
 ) -> list[SetupStep]:
     """Return the provisioning steps in execution order.
 
-    The two service-configuration steps are appended only when an auth key is
-    supplied (the CLI requires one; calling without it yields install-only steps).
+    The sdci service-configuration steps are appended only when an auth key is
+    supplied. The Traefik steps are appended only when both an auth key (needed
+    for the tailnet IP) and a cert email are supplied.
     """
     steps: list[SetupStep] = [
         UserStep(new_user, users=Users(run=run)),
@@ -54,6 +64,21 @@ def build_steps(
                 sdci=Sdci(run=run),
             )
         )
+        if cert_email:
+            tpaths = traefik_paths(new_user)
+            steps.append(TraefikDirsStep(new_user, tpaths, fs=Fs(run=run)))
+            steps.append(TraefikNetworkStep(docker=DockerCli(run=run)))
+            steps.append(
+                TraefikStep(
+                    new_user,
+                    tpaths,
+                    cert_email,
+                    tailscale=Tailscale(run=run),
+                    docker=DockerCli(run=run),
+                    compose=DockerCompose(run=run),
+                    fs=Fs(run=run),
+                )
+            )
     return steps
 
 
@@ -78,6 +103,7 @@ def run_step(step: SetupStep) -> StepResult:
 def run_setup(
     new_user: str,
     auth_key: str | None = None,
+    cert_email: str | None = None,
     *,
     run: Callable = _default_run,
     on_step_start: Callable[[SetupStep], None] | None = None,
@@ -85,7 +111,7 @@ def run_setup(
 ) -> SetupReport:
     """Run all provisioning steps and return the aggregated report."""
     results = []
-    for step in build_steps(new_user, auth_key, run=run):
+    for step in build_steps(new_user, auth_key, cert_email, run=run):
         if on_step_start is not None:
             on_step_start(step)
         result = run_step(step)

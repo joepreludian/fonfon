@@ -45,7 +45,7 @@ def test_build_steps_order_and_titles():
 def test_run_setup_calls_on_result_per_step(monkeypatch):
     steps = [FakeStep("A"), FakeStep("B", satisfied=True), FakeStep("C")]
     monkeypatch.setattr(
-        "fonfon.services.setup.build_steps", lambda u, k=None, run=None: steps
+        "fonfon.services.setup.build_steps", lambda u, k=None, c=None, run=None: steps
     )
     collected = []
     report = run_setup("x", on_result=collected.append)
@@ -57,7 +57,7 @@ def test_run_setup_calls_on_result_per_step(monkeypatch):
 def test_run_setup_calls_on_step_start_per_step(monkeypatch):
     steps = [FakeStep("A"), FakeStep("B", satisfied=True), FakeStep("C")]
     monkeypatch.setattr(
-        "fonfon.services.setup.build_steps", lambda u, k=None, run=None: steps
+        "fonfon.services.setup.build_steps", lambda u, k=None, c=None, run=None: steps
     )
     started = []
     results = []
@@ -69,7 +69,7 @@ def test_run_setup_calls_on_step_start_per_step(monkeypatch):
 def test_run_setup_on_step_start_called_before_on_result(monkeypatch):
     steps = [FakeStep("A")]
     monkeypatch.setattr(
-        "fonfon.services.setup.build_steps", lambda u, k=None, run=None: steps
+        "fonfon.services.setup.build_steps", lambda u, k=None, c=None, run=None: steps
     )
     events = []
     run_setup(
@@ -118,4 +118,34 @@ def test_build_steps_with_auth_key_appends_service_steps():
 
 def test_build_steps_without_auth_key_is_install_only():
     titles = [s.title for s in build_steps("jon")]
+    assert titles == ["User", "Docker", "Docker group", "Tailscale", "pipx", "sdci"]
+
+
+def test_build_steps_with_auth_key_and_cert_email_appends_traefik_steps():
+    titles = [s.title for s in build_steps("jon", "tskey-abc", "you@example.com")]
+    assert titles == [
+        "User",
+        "Docker",
+        "Docker group",
+        "Tailscale",
+        "pipx",
+        "sdci",
+        "Tailscale up",
+        "sdci dirs",
+        "sdci config",
+        "Traefik dirs",
+        "Traefik network",
+        "Traefik",
+    ]
+
+
+def test_build_steps_with_auth_key_but_no_cert_email_skips_traefik():
+    titles = [s.title for s in build_steps("jon", "tskey-abc")]
+    assert "Traefik" not in titles
+    assert titles[-1] == "sdci config"
+
+
+def test_build_steps_cert_email_without_auth_key_adds_nothing():
+    # Traefik needs the tailnet IP, so without an auth key it must not appear.
+    titles = [s.title for s in build_steps("jon", None, "you@example.com")]
     assert titles == ["User", "Docker", "Docker group", "Tailscale", "pipx", "sdci"]
