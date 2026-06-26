@@ -17,7 +17,7 @@ def _ok_report():
 def _patch_run_setup(monkeypatch, report):
     monkeypatch.setattr(
         "fonfon.cli.run_setup",
-        lambda u, k, run=None, on_step_start=None, on_result=None: report,
+        lambda u, k, c=None, run=None, on_step_start=None, on_result=None: report,
     )
 
 
@@ -75,3 +75,38 @@ def test_setup_accepts_key_from_env(monkeypatch):
         main, ["setup", "jon"], env={"FONFON_TAILSCALE_KEY": "tskey-env"}
     )
     assert result.exit_code == 0
+
+
+def test_setup_passes_cert_email_to_run_setup(monkeypatch):
+    monkeypatch.setattr("fonfon.cli.os.geteuid", lambda: 0)
+    seen = {}
+
+    def _spy(u, k, c=None, run=None, on_step_start=None, on_result=None):
+        seen["user"], seen["key"], seen["cert_email"] = u, k, c
+        return _ok_report()
+
+    monkeypatch.setattr("fonfon.cli.run_setup", _spy)
+    result = CliRunner().invoke(
+        main,
+        ["setup", "jon", *_KEY, "--traefik-cert-email", "you@example.com"],
+    )
+    assert result.exit_code == 0
+    assert seen["cert_email"] == "you@example.com"
+
+
+def test_setup_cert_email_from_env(monkeypatch):
+    monkeypatch.setattr("fonfon.cli.os.geteuid", lambda: 0)
+    seen = {}
+
+    def _spy(u, k, c=None, run=None, on_step_start=None, on_result=None):
+        seen["cert_email"] = c
+        return _ok_report()
+
+    monkeypatch.setattr("fonfon.cli.run_setup", _spy)
+    result = CliRunner().invoke(
+        main,
+        ["setup", "jon", *_KEY],
+        env={"FONFON_TRAEFIK_CERT_EMAIL": "env@example.com"},
+    )
+    assert result.exit_code == 0
+    assert seen["cert_email"] == "env@example.com"

@@ -55,6 +55,16 @@ def check(ctx: click.Context, output_format: str) -> None:
     help="Tailscale auth key to join the tailnet (or set FONFON_TAILSCALE_KEY).",
 )
 @click.option(
+    "--traefik-cert-email",
+    "traefik_cert_email",
+    envvar="FONFON_TRAEFIK_CERT_EMAIL",
+    default=None,
+    help=(
+        "Let's Encrypt email for Traefik certificates "
+        "(or set FONFON_TRAEFIK_CERT_EMAIL). Provisions Traefik when set."
+    ),
+)
+@click.option(
     "-o",
     "--output",
     "output_format",
@@ -67,10 +77,11 @@ def setup(
     ctx: click.Context,
     new_user: str,
     tailscale_key: str | None,
+    traefik_cert_email: str | None,
     output_format: str,
 ) -> None:
     """Provision this server (Docker, Tailscale, pipx, sdci), join the tailnet,
-    and configure sdci-server for an operator user."""
+    configure sdci-server, and (with --traefik-cert-email) deploy Traefik."""
     console = Console()
     if os.geteuid() != 0:
         console.print("[red]fonfon setup must be run as root.[/red]")
@@ -83,7 +94,7 @@ def setup(
         console.print("Then re-run: fonfon setup <user> --tailscale-key <key>")
         ctx.exit(1)
     if output_format == "json":
-        report = run_setup(new_user, tailscale_key)
+        report = run_setup(new_user, tailscale_key, traefik_cert_email)
         setup_json.render(report, console)
     else:
         setup_console.render_header(console)
@@ -95,6 +106,7 @@ def setup(
         report = run_setup(
             new_user,
             tailscale_key,
+            traefik_cert_email,
             run=_runner,
             on_step_start=lambda step: setup_console.render_step_start(step, console),
             on_result=lambda r: setup_console.render_step(r, console),
