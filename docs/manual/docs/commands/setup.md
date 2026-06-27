@@ -41,6 +41,14 @@ sudo fonfon setup deploy --tailscale-key <key> \
 See [Services → Traefik](../services/traefik.md) for the full model and the
 application label cookbook.
 
+To also harden SSH — install the operator's `authorized_keys` from a GitHub
+account and lock `sshd` down to key-only auth — pass `--github-user` (or set
+`FONFON_GITHUB_USER`):
+
+```bash
+sudo fonfon setup deploy --tailscale-key <key> --github-user your-gh-handle
+```
+
 ## Provisioning steps
 
 | # | Step | What it does |
@@ -57,6 +65,8 @@ application label cookbook.
 | 10 | **Traefik dirs** | Creates `/home/<user>/services/traefik/{,acme,dynamic}`, owned by the operator, mode `0700` (only when `--traefik-cert-email` is set) |
 | 11 | **Traefik network** | Creates the external `traefik` Docker network so app stacks can attach |
 | 12 | **Traefik** | Writes `docker-compose.yml` (image `traefik:v3.7.5`) + `traefik.yml`, then `docker compose up -d`; dashboard bound to `<tailnet-ip>:8080`, ACME HTTP-01 resolver `le` |
+| 13 | **Authorized keys** | Fetches `https://github.com/<github-user>.keys` and writes `~/.ssh/authorized_keys` (mode `0600`, operator-owned) under a managed header (only when `--github-user` is set). **Fails, writing nothing, if that GitHub account has no public keys.** |
+| 14 | **SSH hardening** | Writes `/etc/ssh/sshd_config.d/99-fonfon-hardening.conf` (`PermitRootLogin no`, `PasswordAuthentication no`, `PubkeyAuthentication yes`, `KbdInteractiveAuthentication no`, `PermitEmptyPasswords no`). **Refuses if the operator has no `authorized_keys`** (lockout guard). Does **not** restart `sshd` — advises a reload. |
 
 ## Idempotency and error handling
 
@@ -88,8 +98,9 @@ sudo fonfon setup deploy --output json | jq .
 
 The JSON payload contains a `steps` array, each entry with `title`, `status`
 (`installed` \| `skipped` \| `failed`), an optional `detail` string, and an
-optional `deployment` object (`base_dir`, `tasks_dir`, `uploads_dir`, `token`)
-on the `sdci config` step.
+optional `deployment` object on the relevant step — sdci (`base_dir`,
+`tasks_dir`, `uploads_dir`, `token`), Traefik, or SSH (`dropin_file`,
+`authorized_keys`, `github_user`, `reload_hint`).
 
 ## The sdci deployment
 
@@ -114,6 +125,56 @@ this executable in `/usr/local/bin` (`PIPX_BIN_DIR`). If `sdci-server` is not
 found, the Packages section of the check report marks it as `FAIL`. In addition,
 `fonfon check` reports the `sdci` systemd unit in the **Services** section
 — it must be enabled and active for that check to pass.
+
+## SSH hardening
+
+Pass `--github-user <account>` (or set `FONFON_GITHUB_USER`) to harden SSH. Two
+steps run last:
+
+1. **Authorized keys** — fonfon fetches the account's public keys from
+   `https://github.com/<account>.keys` and writes them to the operator's
+   `~/.ssh/authorized_keys` (mode `0600`, owned by the operator) under a
+   `# Managed by fonfon` header. The file is **overwritten** to match GitHub.
+2. **SSH hardening** — fonfon writes a drop-in at
+   `/etc/ssh/sshd_config.d/99-fonfon-hardening.conf` (which Debian's stock
+   `sshd_config` already `Include`s):
+
+   ```text
+   PermitRootLogin no
+   PasswordAuthentication no
+   PubkeyAuthentication yes
+   KbdInteractiveAuthentication no
+   PermitEmptyPasswords no
+   ```
+
+!!! danger "Reload SSH afterwards"
+    fonfon does **not** restart or reload `sshd` — changing live SSH policy
+    mid-session is risky. After setup, **reload SSH for the new policy to take
+    effect**:
+
+    ```bash
+    sudo systemctl reload ssh   # or reboot the server
+    ```
+
+    Keep your current session open and verify key-based login in a **new**
+    terminal before closing it.
+
+!!! warning "Lockout safety"
+    Because hardening disables password login, fonfon will not strand you:
+
+    - The **Authorized keys** step fails (writing nothing) if the GitHub account
+      has no published keys.
+    - The **SSH hardening** step refuses to run unless the operator already has a
+      populated `~/.ssh/authorized_keys`.
+
+    So if no usable key is available, password authentication is left enabled and
+    the run exits non-zero with a clear message.
+
+!!! note "Re-running"
+    The **Authorized keys** step is satisfied once the file exists, so a re-run
+    does **not** re-sync from GitHub; delete `~/.ssh/authorized_keys` and re-run
+    to force a refresh. The **SSH hardening** step self-heals: if the drop-in's
+    content drifts, a re-run rewrites it.
 
 !!! note "Debian-family only"
     Docker installation uses `apt`/`dpkg` and targets Debian. Tailscale and
