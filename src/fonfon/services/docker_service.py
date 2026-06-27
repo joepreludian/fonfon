@@ -16,6 +16,12 @@ class DockerReport(BaseModel):
     host: str | None = None
     listening: dict[int, bool] = Field(default_factory=dict)
     external_network: bool = False
+    network_name: str | None = None
+    network_present: bool = False
+    dashboard_port: int | None = None
+    dashboard_tailnet_only: bool = False
+    dashboard_public: bool = False
+    tailnet_ip: str | None = None
 
 
 class DockerService:
@@ -27,14 +33,26 @@ class DockerService:
         self._service = name
         return self
 
-    def ensure_listening(self, host: str, ports: list[int]) -> DockerReport:
+    def ensure_listening(
+        self,
+        host: str,
+        ports: list[int],
+        *,
+        network: str | None = None,
+        dashboard_port: int | None = None,
+        tailnet_ip: str | None = None,
+    ) -> DockerReport:
         if not self._docker.is_available():
             return DockerReport(
                 docker_installed=False,
                 service=self._service,
                 host=host,
                 listening={p: False for p in ports},
+                network_name=network,
+                dashboard_port=dashboard_port,
+                tailnet_ip=tailnet_ip,
             )
+        network_present = self._docker.network_exists(network) if network else False
         inspect = self._docker.inspect_container(self._service)
         if inspect is None:
             return DockerReport(
@@ -44,6 +62,10 @@ class DockerService:
                 host=host,
                 listening={p: False for p in ports},
                 external_network=False,
+                network_name=network,
+                network_present=network_present,
+                dashboard_port=dashboard_port,
+                tailnet_ip=tailnet_ip,
             )
         net = inspect.get("NetworkSettings", {})
         published = net.get("Ports") or {}
@@ -54,6 +76,17 @@ class DockerService:
             )
             for port in ports
         }
+        dashboard_public = False
+        dashboard_tailnet_only = False
+        if dashboard_port is not None:
+            binds = published.get(f"{dashboard_port}/tcp") or []
+            host_ips = [b.get("HostIp") for b in binds]
+            dashboard_public = any(ip in {"0.0.0.0", "::", ""} for ip in host_ips)
+            dashboard_tailnet_only = (
+                bool(binds)
+                and tailnet_ip is not None
+                and all(ip == tailnet_ip for ip in host_ips)
+            )
         networks = set(net.get("Networks", {}).keys())
         return DockerReport(
             docker_installed=True,
@@ -62,4 +95,10 @@ class DockerService:
             host=host,
             listening=listening,
             external_network=bool(networks - _DEFAULT_NETWORKS),
+            network_name=network,
+            network_present=network_present,
+            dashboard_port=dashboard_port,
+            dashboard_public=dashboard_public,
+            dashboard_tailnet_only=dashboard_tailnet_only,
+            tailnet_ip=tailnet_ip,
         )

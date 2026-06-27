@@ -4,14 +4,18 @@ from fonfon.services.docker_service import DockerService
 
 
 class FakeDocker:
-    def __init__(self, available=True, inspect=None):
+    def __init__(self, available=True, inspect=None, networks=()):
         self._available, self._inspect = available, inspect
+        self._networks = set(networks)
 
     def is_available(self):
         return self._available
 
     def inspect_container(self, name):
         return self._inspect
+
+    def network_exists(self, name):
+        return name in self._networks
 
 
 def test_docker_absent_marks_not_installed():
@@ -140,3 +144,93 @@ def test_all_interfaces_binding_is_listening():
         .ensure_listening("0.0.0.0", [80])
     )
     assert report.listening == {80: True}
+
+
+def test_network_present_true_when_named_network_exists():
+    inspect = {"NetworkSettings": {"Ports": {}, "Networks": {}}}
+    report = (
+        DockerService(docker=FakeDocker(inspect=inspect, networks=["traefik"]))
+        .for_service("traefik")
+        .ensure_listening("0.0.0.0", [], network="traefik")
+    )
+    assert report.network_present is True
+    assert report.network_name == "traefik"
+
+
+def test_network_present_false_when_absent():
+    inspect = {"NetworkSettings": {"Ports": {}, "Networks": {}}}
+    report = (
+        DockerService(docker=FakeDocker(inspect=inspect))
+        .for_service("traefik")
+        .ensure_listening("0.0.0.0", [], network="traefik")
+    )
+    assert report.network_present is False
+
+
+def test_network_checked_even_when_container_absent():
+    report = (
+        DockerService(docker=FakeDocker(inspect=None, networks=["traefik"]))
+        .for_service("traefik")
+        .ensure_listening("0.0.0.0", [80], network="traefik")
+    )
+    assert report.present is False
+    assert report.network_present is True
+
+
+def test_dashboard_tailnet_only_when_bound_to_tailnet_ip():
+    inspect = {
+        "NetworkSettings": {
+            "Ports": {"8080/tcp": [{"HostIp": "100.64.0.1", "HostPort": "8080"}]},
+            "Networks": {},
+        }
+    }
+    report = (
+        DockerService(docker=FakeDocker(inspect=inspect))
+        .for_service("traefik")
+        .ensure_listening("0.0.0.0", [], dashboard_port=8080, tailnet_ip="100.64.0.1")
+    )
+    assert report.dashboard_tailnet_only is True
+    assert report.dashboard_public is False
+
+
+def test_dashboard_public_when_bound_to_all_interfaces():
+    inspect = {
+        "NetworkSettings": {
+            "Ports": {"8080/tcp": [{"HostIp": "0.0.0.0", "HostPort": "8080"}]},
+            "Networks": {},
+        }
+    }
+    report = (
+        DockerService(docker=FakeDocker(inspect=inspect))
+        .for_service("traefik")
+        .ensure_listening("0.0.0.0", [], dashboard_port=8080, tailnet_ip="100.64.0.1")
+    )
+    assert report.dashboard_public is True
+    assert report.dashboard_tailnet_only is False
+
+
+def test_dashboard_not_tailnet_only_when_tailnet_ip_unknown():
+    inspect = {
+        "NetworkSettings": {
+            "Ports": {"8080/tcp": [{"HostIp": "100.64.0.1", "HostPort": "8080"}]},
+            "Networks": {},
+        }
+    }
+    report = (
+        DockerService(docker=FakeDocker(inspect=inspect))
+        .for_service("traefik")
+        .ensure_listening("0.0.0.0", [], dashboard_port=8080, tailnet_ip=None)
+    )
+    assert report.dashboard_tailnet_only is False
+    assert report.dashboard_public is False
+
+
+def test_dashboard_unpublished_gives_both_false():
+    inspect = {"NetworkSettings": {"Ports": {}, "Networks": {}}}
+    report = (
+        DockerService(docker=FakeDocker(inspect=inspect))
+        .for_service("traefik")
+        .ensure_listening("0.0.0.0", [], dashboard_port=8080, tailnet_ip="100.64.0.1")
+    )
+    assert report.dashboard_public is False
+    assert report.dashboard_tailnet_only is False
