@@ -5,6 +5,7 @@ from collections.abc import Callable
 from fonfon.models_setup import SetupReport, SetupStatus, StepResult
 from fonfon.services.sdci_paths import sdci_paths
 from fonfon.services.setup_steps import (
+    AuthorizedKeysStep,
     DockerGroupStep,
     DockerStep,
     PipxStep,
@@ -12,6 +13,7 @@ from fonfon.services.setup_steps import (
     SdciDirsStep,
     SdciStep,
     SetupStep,
+    SshHardeningStep,
     TailscaleStep,
     TailscaleUpStep,
     TraefikDirsStep,
@@ -19,6 +21,7 @@ from fonfon.services.setup_steps import (
     TraefikStep,
     UserStep,
 )
+from fonfon.services.ssh_paths import ssh_paths
 from fonfon.services.traefik_paths import traefik_paths
 from fonfon.system._run import run as _default_run
 from fonfon.system.apt import Apt
@@ -26,6 +29,7 @@ from fonfon.system.docker_cli import DockerCli
 from fonfon.system.docker_compose import DockerCompose
 from fonfon.system.dpkg import Dpkg
 from fonfon.system.fs import Fs
+from fonfon.system.github_keys import GitHubKeys
 from fonfon.system.pipx import Pipx
 from fonfon.system.sdci import Sdci
 from fonfon.system.tailscale import Tailscale
@@ -36,13 +40,15 @@ def build_steps(
     new_user: str,
     auth_key: str | None = None,
     cert_email: str | None = None,
+    github_user: str | None = None,
     run: Callable = _default_run,
 ) -> list[SetupStep]:
     """Return the provisioning steps in execution order.
 
-    The sdci service-configuration steps are appended only when an auth key is
-    supplied. The Traefik steps are appended only when both an auth key (needed
-    for the tailnet IP) and a cert email are supplied.
+    The sdci steps are appended only when an auth key is supplied; the Traefik
+    steps only when both an auth key and a cert email are supplied. The SSH
+    hardening steps are appended last, only when a GitHub user is supplied
+    (independent of the auth key — hardening needs only the operator account).
     """
     steps: list[SetupStep] = [
         UserStep(new_user, users=Users(run=run)),
@@ -79,6 +85,14 @@ def build_steps(
                     fs=Fs(run=run),
                 )
             )
+    if github_user:
+        spaths = ssh_paths(new_user)
+        steps.append(
+            AuthorizedKeysStep(
+                new_user, github_user, spaths, github=GitHubKeys(), fs=Fs(run=run)
+            )
+        )
+        steps.append(SshHardeningStep(new_user, github_user, spaths, fs=Fs(run=run)))
     return steps
 
 
@@ -104,6 +118,7 @@ def run_setup(
     new_user: str,
     auth_key: str | None = None,
     cert_email: str | None = None,
+    github_user: str | None = None,
     *,
     run: Callable = _default_run,
     on_step_start: Callable[[SetupStep], None] | None = None,
@@ -111,7 +126,7 @@ def run_setup(
 ) -> SetupReport:
     """Run all provisioning steps and return the aggregated report."""
     results = []
-    for step in build_steps(new_user, auth_key, cert_email, run=run):
+    for step in build_steps(new_user, auth_key, cert_email, github_user, run=run):
         if on_step_start is not None:
             on_step_start(step)
         result = run_step(step)

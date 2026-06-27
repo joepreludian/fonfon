@@ -45,7 +45,8 @@ def test_build_steps_order_and_titles():
 def test_run_setup_calls_on_result_per_step(monkeypatch):
     steps = [FakeStep("A"), FakeStep("B", satisfied=True), FakeStep("C")]
     monkeypatch.setattr(
-        "fonfon.services.setup.build_steps", lambda u, k=None, c=None, run=None: steps
+        "fonfon.services.setup.build_steps",
+        lambda u, k=None, c=None, g=None, run=None: steps,
     )
     collected = []
     report = run_setup("x", on_result=collected.append)
@@ -57,7 +58,8 @@ def test_run_setup_calls_on_result_per_step(monkeypatch):
 def test_run_setup_calls_on_step_start_per_step(monkeypatch):
     steps = [FakeStep("A"), FakeStep("B", satisfied=True), FakeStep("C")]
     monkeypatch.setattr(
-        "fonfon.services.setup.build_steps", lambda u, k=None, c=None, run=None: steps
+        "fonfon.services.setup.build_steps",
+        lambda u, k=None, c=None, g=None, run=None: steps,
     )
     started = []
     results = []
@@ -69,7 +71,8 @@ def test_run_setup_calls_on_step_start_per_step(monkeypatch):
 def test_run_setup_on_step_start_called_before_on_result(monkeypatch):
     steps = [FakeStep("A")]
     monkeypatch.setattr(
-        "fonfon.services.setup.build_steps", lambda u, k=None, c=None, run=None: steps
+        "fonfon.services.setup.build_steps",
+        lambda u, k=None, c=None, g=None, run=None: steps,
     )
     events = []
     run_setup(
@@ -149,3 +152,49 @@ def test_build_steps_cert_email_without_auth_key_adds_nothing():
     # Traefik needs the tailnet IP, so without an auth key it must not appear.
     titles = [s.title for s in build_steps("jon", None, "you@example.com")]
     assert titles == ["User", "Docker", "Docker group", "Tailscale", "pipx", "sdci"]
+
+
+def test_build_steps_with_github_user_appends_ssh_steps_last():
+    titles = [s.title for s in build_steps("jon", "tskey-abc", None, "octocat")]
+    assert titles == [
+        "User",
+        "Docker",
+        "Docker group",
+        "Tailscale",
+        "pipx",
+        "sdci",
+        "Tailscale up",
+        "sdci dirs",
+        "sdci config",
+        "Authorized keys",
+        "SSH hardening",
+    ]
+
+
+def test_build_steps_github_user_without_auth_key_still_hardens():
+    # SSH hardening only needs the operator user, not the tailnet.
+    titles = [s.title for s in build_steps("jon", None, None, "octocat")]
+    assert titles == [
+        "User",
+        "Docker",
+        "Docker group",
+        "Tailscale",
+        "pipx",
+        "sdci",
+        "Authorized keys",
+        "SSH hardening",
+    ]
+
+
+def test_build_steps_without_github_user_has_no_ssh_steps():
+    titles = [s.title for s in build_steps("jon", "tskey-abc")]
+    assert "Authorized keys" not in titles
+    assert "SSH hardening" not in titles
+
+
+def test_build_steps_all_flags_order_ssh_after_traefik():
+    titles = [
+        s.title for s in build_steps("jon", "tskey-abc", "you@example.com", "octocat")
+    ]
+    assert titles[-2:] == ["Authorized keys", "SSH hardening"]
+    assert "Traefik" in titles
