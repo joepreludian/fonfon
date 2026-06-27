@@ -9,6 +9,7 @@ from fonfon.models_setup import (
     SdciDeployment,
     SetupReport,
     SetupStatus,
+    SshDeployment,
     StepResult,
     TraefikDeployment,
 )
@@ -139,3 +140,37 @@ def test_console_summary_renders_both_panels():
     out = _render_summary(report)
     assert "sdci-server deployed" in out
     assert "Traefik deployed" in out
+
+
+def _report_with_ssh():
+    return SetupReport(
+        steps=[
+            StepResult(
+                title="SSH hardening",
+                status=SetupStatus.INSTALLED,
+                detail="installed",
+                deployment=SshDeployment(
+                    dropin_file="/etc/ssh/sshd_config.d/99-fonfon-hardening.conf",
+                    authorized_keys="/home/p/.ssh/authorized_keys",
+                    github_user="octocat",
+                    reload_hint="sudo systemctl reload ssh",
+                ),
+            ),
+        ]
+    )
+
+
+def test_console_summary_renders_ssh_panel_and_reload_advice():
+    out = _render_summary(_report_with_ssh())
+    assert "SSH hardened" in out
+    assert "octocat" in out
+    assert "/home/p/.ssh/authorized_keys" in out
+    assert "99-fonfon-hardening.conf" in out
+    assert "Reload SSH" in out
+    assert "systemctl reload ssh" in out
+
+
+def test_console_summary_no_ssh_panel_without_deployment():
+    out = _render_summary(_report())
+    assert "SSH hardened" not in out
+    assert "Reload SSH" not in out

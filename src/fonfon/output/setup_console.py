@@ -9,6 +9,7 @@ from fonfon.models_setup import (
     SdciDeployment,
     SetupReport,
     SetupStatus,
+    SshDeployment,
     StepResult,
     TraefikDeployment,
 )
@@ -68,6 +69,17 @@ def _traefik_panel(deployment: TraefikDeployment) -> Panel:
     return Panel.fit(table, title="Traefik deployed", border_style="green")
 
 
+def _ssh_panel(deployment: SshDeployment) -> Panel:
+    """Return a Panel summarising the SSH hardening result."""
+    table = Table.grid(padding=(0, 2))
+    table.add_column(style="bold")
+    table.add_column()
+    table.add_row("github user", deployment.github_user)
+    table.add_row("authorized_keys", deployment.authorized_keys)
+    table.add_row("drop-in", deployment.dropin_file)
+    return Panel.fit(table, title="SSH hardened", border_style="yellow")
+
+
 def render_summary(report: SetupReport, console: Console) -> None:
     """Print the counts footer and a panel for each deployed service."""
     installed = sum(1 for s in report.steps if s.status is SetupStatus.INSTALLED)
@@ -84,6 +96,12 @@ def render_summary(report: SetupReport, console: Console) -> None:
             console.print(_deployment_panel(deployment))
         elif isinstance(deployment, TraefikDeployment):
             console.print(_traefik_panel(deployment))
+        elif isinstance(deployment, SshDeployment):
+            console.print(_ssh_panel(deployment))
+            console.print(
+                f"[bold yellow]⚠ Reload SSH to apply: {deployment.reload_hint} "
+                "(or reboot the server).[/bold yellow]"
+            )
 
 
 def render(report: SetupReport, console: Console) -> None:
