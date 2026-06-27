@@ -16,7 +16,7 @@ from fonfon.ui import build_banner, build_usage_hint
 
 
 @click.group(invoke_without_command=True)
-@click.version_option(version=get_version(), prog_name="Fonfon")
+@click.version_option(get_version(), "-V", "--version", prog_name="Fonfon")
 @click.pass_context
 def main(ctx: click.Context) -> None:
     """Fonfon — an opinionated VPS configurator."""

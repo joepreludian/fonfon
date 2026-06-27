@@ -40,6 +40,10 @@ def build_usage_hint() -> RenderableType:
         "sudo fonfon setup <user> --tailscale-key <key>",
         "— provision the server",
     )
+    grid.add_row(
+        "  --github-user <gh>",
+        "— harden SSH from GitHub",
+    )
     return Panel.fit(grid, border_style=ORANGE, title=Text("Quick start", style=ORANGE))
 
 

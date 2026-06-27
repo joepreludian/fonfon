@@ -46,3 +46,8 @@ def test_usage_hint_shows_check_and_setup_commands():
     out = _render(build_usage_hint())
     assert "fonfon check" in out
     assert "sudo fonfon setup" in out
+
+
+def test_usage_hint_documents_github_user():
+    out = _render(build_usage_hint())
+    assert "--github-user" in out

@@ -17,7 +17,10 @@ primary entry points:
 
 - `fonfon check` — inspect the system and report readiness.
 - `sudo fonfon setup <user> --tailscale-key <key>` — provision the server
-  (Docker, Tailscale, sdci, and more).
+  (Docker, Tailscale, sdci, and more). Add `--github-user <gh>` to also harden
+  SSH from that GitHub account's public keys.
+
+Check the installed version at any time with `fonfon --version` (or `-V`).
 
 ## Requirements
 

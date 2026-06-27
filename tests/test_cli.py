@@ -30,3 +30,16 @@ def test_cli_shows_usage_hints():
     result = CliRunner().invoke(main)
     assert "fonfon check" in result.output
     assert "sudo fonfon setup" in result.output
+    assert "--github-user" in result.output
+
+
+def test_cli_version_flag_returns_version():
+    result = CliRunner().invoke(main, ["--version"])
+    assert result.exit_code == 0
+    assert get_version() in result.output
+
+
+def test_cli_version_short_flag_returns_version():
+    result = CliRunner().invoke(main, ["-V"])
+    assert result.exit_code == 0
+    assert get_version() in result.output
