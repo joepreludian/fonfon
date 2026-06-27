@@ -28,7 +28,7 @@ def test_docker_absent_marks_not_installed():
     assert report.present is False
 
 
-def test_traefik_listening_and_external_network():
+def test_traefik_listening():
     inspect = {
         "Name": "/traefik",
         "NetworkSettings": {
@@ -47,7 +47,6 @@ def test_traefik_listening_and_external_network():
     assert report.docker_installed is True
     assert report.present is True
     assert report.listening == {80: True, 443: True}
-    assert report.external_network is True
 
 
 def test_traefik_absent_when_inspect_none():
@@ -58,7 +57,6 @@ def test_traefik_absent_when_inspect_none():
     )
     assert report.present is False
     assert report.listening == {80: False}
-    assert report.external_network is False
 
 
 def test_port_not_listening_when_host_port_mismatch():
@@ -77,21 +75,6 @@ def test_port_not_listening_when_host_port_mismatch():
         .ensure_listening(host="0.0.0.0", ports=[80])
     )
     assert report.listening == {80: False}
-
-
-def test_only_default_networks_gives_external_network_false():
-    inspect = {
-        "NetworkSettings": {
-            "Ports": {},
-            "Networks": {"bridge": {}, "host": {}},
-        }
-    }
-    report = (
-        DockerService(docker=FakeDocker(inspect=inspect))
-        .for_service("svc")
-        .ensure_listening(host="0.0.0.0", ports=[])
-    )
-    assert report.external_network is False
 
 
 def test_port_value_none_not_raises_and_returns_false():

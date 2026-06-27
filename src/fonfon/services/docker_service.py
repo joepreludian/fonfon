@@ -6,8 +6,6 @@ from pydantic import BaseModel, Field
 
 from fonfon.system.docker_cli import DockerCli
 
-_DEFAULT_NETWORKS = {"bridge", "host", "none"}
-
 
 class DockerReport(BaseModel):
     docker_installed: bool
@@ -15,7 +13,6 @@ class DockerReport(BaseModel):
     present: bool = False
     host: str | None = None
     listening: dict[int, bool] = Field(default_factory=dict)
-    external_network: bool = False
     network_name: str | None = None
     network_present: bool = False
     dashboard_port: int | None = None
@@ -61,7 +58,6 @@ class DockerService:
                 present=False,
                 host=host,
                 listening={p: False for p in ports},
-                external_network=False,
                 network_name=network,
                 network_present=network_present,
                 dashboard_port=dashboard_port,
@@ -87,14 +83,12 @@ class DockerService:
                 and tailnet_ip is not None
                 and all(ip == tailnet_ip for ip in host_ips)
             )
-        networks = set(net.get("Networks", {}).keys())
         return DockerReport(
             docker_installed=True,
             service=self._service,
             present=True,
             host=host,
             listening=listening,
-            external_network=bool(networks - _DEFAULT_NETWORKS),
             network_name=network,
             network_present=network_present,
             dashboard_port=dashboard_port,
