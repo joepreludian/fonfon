@@ -10,21 +10,31 @@ from fonfon.services.package_backends import (
 )
 from fonfon.services.package_service import PackageReport, PackageService
 from fonfon.services.systemd_service import ServicesReport, SystemdService
+from fonfon.services.traefik_config import TRAEFIK_NETWORK
 from fonfon.system.pipx import Pipx
 
 PACKAGES = ["sudo", "docker-ce", "tailscale", "pipx"]
 SERVICES = ["docker", "ssh", "tailscaled", "sdci"]
 TRAEFIK_PORTS = [80, 443]
+TRAEFIK_DASHBOARD_PORT = 8080
+TAILSCALE_IFACE = "tailscale0"
 
 
 def run_check() -> CheckReport:
     os_info = OSService().get_info()
     services = SystemdService().for_services(SERVICES).get_status()
     network = NetworkService().get_ips()
+    tailnet_ip = network.interfaces.get(TAILSCALE_IFACE)
     docker = (
         DockerService()
         .for_service("traefik")
-        .ensure_listening(host="0.0.0.0", ports=TRAEFIK_PORTS)
+        .ensure_listening(
+            host="0.0.0.0",
+            ports=TRAEFIK_PORTS,
+            network=TRAEFIK_NETWORK,
+            dashboard_port=TRAEFIK_DASHBOARD_PORT,
+            tailnet_ip=tailnet_ip,
+        )
     )
     try:
         backend = select_package_backend(os_info.distro_id)
@@ -169,24 +179,44 @@ def _docker_section(docker: DockerReport) -> CheckSection:
         status=CheckStatus.OK if docker.present else CheckStatus.WARN,
         detail="running" if docker.present else "container not running",
     )
+    net_name = docker.network_name or "external"
+    network = CheckItem(
+        key="docker.network",
+        label="network",
+        status=CheckStatus.OK if docker.network_present else CheckStatus.WARN,
+        detail=(
+            f"'{net_name}' created"
+            if docker.network_present
+            else f"'{net_name}' not created"
+        ),
+    )
+    listening_ok = bool(docker.listening) and all(docker.listening.values())
     ports = CheckItem(
         key="docker.ports",
         label="ports 80/443",
-        status=(
-            CheckStatus.OK
-            if all(docker.listening.values()) and docker.listening
-            else CheckStatus.WARN
-        ),
-        detail=(
-            "listening"
-            if all(docker.listening.values()) and docker.listening
-            else "not listening"
-        ),
+        status=CheckStatus.OK if listening_ok else CheckStatus.WARN,
+        detail="listening" if listening_ok else "not listening",
     )
-    network = CheckItem(
-        key="docker.network",
-        label="ext. network",
-        status=CheckStatus.OK if docker.external_network else CheckStatus.WARN,
-        detail="attached" if docker.external_network else "none attached",
+    return CheckSection(
+        title="Docker", items=[present, network, ports, _dashboard_item(docker)]
     )
-    return CheckSection(title="Docker", items=[present, ports, network])
+
+
+def _dashboard_item(docker: DockerReport) -> CheckItem:
+    port = docker.dashboard_port
+    if not docker.present:
+        status, detail = CheckStatus.WARN, "container not running"
+    elif docker.dashboard_public:
+        status, detail = CheckStatus.FAIL, f"exposed publicly (0.0.0.0:{port})"
+    elif docker.dashboard_tailnet_only:
+        status, detail = CheckStatus.OK, f"tailnet-only ({docker.tailnet_ip}:{port})"
+    elif docker.tailnet_ip is None:
+        status, detail = CheckStatus.WARN, "tailnet IP unknown (is tailscale up?)"
+    else:
+        status, detail = CheckStatus.WARN, "not published on tailnet"
+    return CheckItem(
+        key="docker.dashboard",
+        label="dashboard (tailnet-only)",
+        status=status,
+        detail=detail,
+    )

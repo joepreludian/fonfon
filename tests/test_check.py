@@ -73,7 +73,7 @@ def test_docker_gaps_are_warn():
             service="traefik",
             present=False,
             listening={80: False, 443: False},
-            external_network=False,
+            network_present=False,
         )
     )
     dock = _items(report, "Docker")
@@ -116,10 +116,65 @@ def test_docker_all_ok_path():
         service="traefik",
         present=True,
         listening={80: True, 443: True},
-        external_network=True,
+        network_present=True,
+        network_name="traefik",
+        dashboard_port=8080,
+        dashboard_tailnet_only=True,
+        tailnet_ip="100.64.0.1",
     )
     items = _items(_base(docker=docker), "Docker")
     assert all(i.status is CheckStatus.OK for i in items.values())
+
+
+def test_docker_dashboard_public_is_fail():
+    docker = DockerReport(
+        docker_installed=True,
+        service="traefik",
+        present=True,
+        listening={80: True, 443: True},
+        network_present=True,
+        network_name="traefik",
+        dashboard_port=8080,
+        dashboard_public=True,
+        tailnet_ip="100.64.0.1",
+    )
+    item = _items(_base(docker=docker), "Docker")["dashboard (tailnet-only)"]
+    assert item.status is CheckStatus.FAIL
+    assert "publicly" in item.detail
+
+
+def test_docker_dashboard_tailnet_only_is_ok_with_ip_detail():
+    docker = DockerReport(
+        docker_installed=True,
+        service="traefik",
+        present=True,
+        listening={80: True, 443: True},
+        network_present=True,
+        network_name="traefik",
+        dashboard_port=8080,
+        dashboard_tailnet_only=True,
+        tailnet_ip="100.64.0.1",
+    )
+    item = _items(_base(docker=docker), "Docker")["dashboard (tailnet-only)"]
+    assert item.status is CheckStatus.OK
+    assert "100.64.0.1" in item.detail
+
+
+def test_docker_network_created_ok_missing_warn():
+    common = dict(
+        docker_installed=True,
+        service="traefik",
+        present=True,
+        listening={80: True, 443: True},
+        network_name="traefik",
+        dashboard_port=8080,
+        dashboard_tailnet_only=True,
+        tailnet_ip="100.64.0.1",
+    )
+    created = DockerReport(network_present=True, **common)
+    missing = DockerReport(network_present=False, **common)
+    assert _items(_base(docker=created), "Docker")["network"].status is CheckStatus.OK
+    assert _items(_base(docker=missing), "Docker")["network"].status is CheckStatus.WARN
 
 
 def test_sdci_installed_is_ok():
