@@ -17,7 +17,9 @@ def _ok_report():
 def _patch_run_setup(monkeypatch, report):
     monkeypatch.setattr(
         "fonfon.cli.run_setup",
-        lambda u, k, c=None, run=None, on_step_start=None, on_result=None: report,
+        lambda u, k, c=None, g=None, run=None, on_step_start=None, on_result=None: (
+            report
+        ),
     )
 
 
@@ -81,7 +83,7 @@ def test_setup_passes_cert_email_to_run_setup(monkeypatch):
     monkeypatch.setattr("fonfon.cli.os.geteuid", lambda: 0)
     seen = {}
 
-    def _spy(u, k, c=None, run=None, on_step_start=None, on_result=None):
+    def _spy(u, k, c=None, g=None, run=None, on_step_start=None, on_result=None):
         seen["user"], seen["key"], seen["cert_email"] = u, k, c
         return _ok_report()
 
@@ -98,7 +100,7 @@ def test_setup_cert_email_from_env(monkeypatch):
     monkeypatch.setattr("fonfon.cli.os.geteuid", lambda: 0)
     seen = {}
 
-    def _spy(u, k, c=None, run=None, on_step_start=None, on_result=None):
+    def _spy(u, k, c=None, g=None, run=None, on_step_start=None, on_result=None):
         seen["cert_email"] = c
         return _ok_report()
 
@@ -110,3 +112,35 @@ def test_setup_cert_email_from_env(monkeypatch):
     )
     assert result.exit_code == 0
     assert seen["cert_email"] == "env@example.com"
+
+
+def test_setup_passes_github_user_to_run_setup(monkeypatch):
+    monkeypatch.setattr("fonfon.cli.os.geteuid", lambda: 0)
+    seen = {}
+
+    def _spy(u, k, c=None, g=None, run=None, on_step_start=None, on_result=None):
+        seen["github_user"] = g
+        return _ok_report()
+
+    monkeypatch.setattr("fonfon.cli.run_setup", _spy)
+    result = CliRunner().invoke(
+        main, ["setup", "jon", *_KEY, "--github-user", "octocat"]
+    )
+    assert result.exit_code == 0
+    assert seen["github_user"] == "octocat"
+
+
+def test_setup_github_user_from_env(monkeypatch):
+    monkeypatch.setattr("fonfon.cli.os.geteuid", lambda: 0)
+    seen = {}
+
+    def _spy(u, k, c=None, g=None, run=None, on_step_start=None, on_result=None):
+        seen["github_user"] = g
+        return _ok_report()
+
+    monkeypatch.setattr("fonfon.cli.run_setup", _spy)
+    result = CliRunner().invoke(
+        main, ["setup", "jon", *_KEY], env={"FONFON_GITHUB_USER": "envcat"}
+    )
+    assert result.exit_code == 0
+    assert seen["github_user"] == "envcat"

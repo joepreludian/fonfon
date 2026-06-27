@@ -65,6 +65,16 @@ def check(ctx: click.Context, output_format: str) -> None:
     ),
 )
 @click.option(
+    "--github-user",
+    "github_user",
+    envvar="FONFON_GITHUB_USER",
+    default=None,
+    help=(
+        "GitHub username whose public SSH keys seed the operator's "
+        "authorized_keys (or set FONFON_GITHUB_USER). Hardens SSH when set."
+    ),
+)
+@click.option(
     "-o",
     "--output",
     "output_format",
@@ -78,10 +88,12 @@ def setup(
     new_user: str,
     tailscale_key: str | None,
     traefik_cert_email: str | None,
+    github_user: str | None,
     output_format: str,
 ) -> None:
     """Provision this server (Docker, Tailscale, pipx, sdci), join the tailnet,
-    configure sdci-server, and (with --traefik-cert-email) deploy Traefik."""
+    configure sdci-server, optionally deploy Traefik (--traefik-cert-email), and
+    optionally harden SSH from a GitHub user's keys (--github-user)."""
     console = Console()
     if os.geteuid() != 0:
         console.print("[red]fonfon setup must be run as root.[/red]")
@@ -94,7 +106,7 @@ def setup(
         console.print("Then re-run: fonfon setup <user> --tailscale-key <key>")
         ctx.exit(1)
     if output_format == "json":
-        report = run_setup(new_user, tailscale_key, traefik_cert_email)
+        report = run_setup(new_user, tailscale_key, traefik_cert_email, github_user)
         setup_json.render(report, console)
     else:
         setup_console.render_header(console)
@@ -107,6 +119,7 @@ def setup(
             new_user,
             tailscale_key,
             traefik_cert_email,
+            github_user,
             run=_runner,
             on_step_start=lambda step: setup_console.render_step_start(step, console),
             on_result=lambda r: setup_console.render_step(r, console),
