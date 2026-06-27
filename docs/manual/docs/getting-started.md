@@ -3,6 +3,22 @@
 This page is a placeholder for the base manual. Flesh it out as Fonfon's
 commands take shape.
 
+## First run
+
+Once `fonfon` is on the target host, run it with no arguments to get your
+bearings:
+
+```bash
+fonfon
+```
+
+This prints the Fonfon banner and a quick-reference table showing the two
+primary entry points:
+
+- `fonfon check` — inspect the system and report readiness.
+- `sudo fonfon setup <user> --tailscale-key <key>` — provision the server
+  (Docker, Tailscale, sdci, and more).
+
 ## Requirements
 
 - A fresh Linux VPS you can reach over SSH.
