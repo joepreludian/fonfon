@@ -30,6 +30,19 @@ def build_action_box(action: str) -> RenderableType:
     )
 
 
+def build_usage_hint() -> RenderableType:
+    """Panel showing the two primary commands: check and setup."""
+    grid = Table.grid(padding=(0, 2))
+    grid.add_column(style=f"bold {ORANGE_BRIGHT}")
+    grid.add_column(style=ORANGE_DIM)
+    grid.add_row("fonfon check", "— inspect system readiness")
+    grid.add_row(
+        "sudo fonfon setup <user> --tailscale-key <key>",
+        "— provision the server",
+    )
+    return Panel.fit(grid, border_style=ORANGE, title=Text("Quick start", style=ORANGE))
+
+
 def build_banner() -> RenderableType:
     """Build the orange hello banner: logo, project name, version, greeting."""
     body = Group(

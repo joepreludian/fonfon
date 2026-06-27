@@ -24,3 +24,9 @@ def test_cli_shows_version():
 def test_cli_shows_hello_world():
     result = CliRunner().invoke(main)
     assert "Hello, World!" in result.output
+
+
+def test_cli_shows_usage_hints():
+    result = CliRunner().invoke(main)
+    assert "fonfon check" in result.output
+    assert "sudo fonfon setup" in result.output

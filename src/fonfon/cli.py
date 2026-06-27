@@ -12,7 +12,7 @@ from fonfon.output import setup_console, setup_json
 from fonfon.services.check import run_check
 from fonfon.services.setup import run_setup
 from fonfon.system.streaming import run_streamed
-from fonfon.ui import build_banner
+from fonfon.ui import build_banner, build_usage_hint
 
 
 @click.group(invoke_without_command=True)
@@ -21,7 +21,9 @@ from fonfon.ui import build_banner
 def main(ctx: click.Context) -> None:
     """Fonfon — an opinionated VPS configurator."""
     if ctx.invoked_subcommand is None:
-        Console().print(build_banner())
+        console = Console()
+        console.print(build_banner())
+        console.print(build_usage_hint())
 
 
 @main.command()

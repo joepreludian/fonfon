@@ -6,7 +6,7 @@ from rich.console import Console
 
 from fonfon import get_version
 from fonfon.logo import CAT_LOGO
-from fonfon.ui import build_action_box, build_banner
+from fonfon.ui import build_action_box, build_banner, build_usage_hint
 
 
 def _render(renderable) -> str:
@@ -40,3 +40,9 @@ def test_action_box_renders_and_contains_action_label():
 def test_action_box_renders_setup_label():
     out = _render(build_action_box("setup"))
     assert "setup" in out
+
+
+def test_usage_hint_shows_check_and_setup_commands():
+    out = _render(build_usage_hint())
+    assert "fonfon check" in out
+    assert "sudo fonfon setup" in out
