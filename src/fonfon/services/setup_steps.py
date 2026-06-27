@@ -3,8 +3,15 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 
-from fonfon.models_setup import SdciDeployment, TraefikDeployment
+from fonfon.models_setup import SdciDeployment, SshDeployment, TraefikDeployment
 from fonfon.services.sdci_paths import SdciPaths
+from fonfon.services.ssh_config import (
+    SSHD_DROPIN_DIR,
+    SSHD_DROPIN_PATH,
+    render_authorized_keys,
+    render_sshd_hardening,
+)
+from fonfon.services.ssh_paths import SshPaths
 from fonfon.services.token import generate_token
 from fonfon.services.traefik_config import (
     TRAEFIK_NETWORK,
@@ -19,6 +26,7 @@ from fonfon.system.docker_cli import DockerCli
 from fonfon.system.docker_compose import DockerCompose
 from fonfon.system.dpkg import Dpkg
 from fonfon.system.fs import Fs
+from fonfon.system.github_keys import GitHubKeys
 from fonfon.system.pipx import Pipx
 from fonfon.system.sdci import Sdci
 from fonfon.system.tailscale import Tailscale
@@ -30,6 +38,12 @@ SDCI_DIR_MODE = "0700"
 
 TRAEFIK_DIR_MODE = "0700"
 TRAEFIK_FILE_MODE = "0644"
+
+SSH_DIR_MODE = "0700"
+AUTHORIZED_KEYS_MODE = "0600"
+SSHD_DROPIN_DIR_MODE = "0755"
+SSHD_DROPIN_FILE_MODE = "0644"
+SSH_RELOAD_HINT = "sudo systemctl reload ssh"
 
 DOCKER_PACKAGES = [
     "docker-ce",
@@ -48,7 +62,7 @@ class SetupStep(ABC):
     """Base class for an idempotent provisioning action."""
 
     title: str
-    deployment: SdciDeployment | TraefikDeployment | None = (
+    deployment: SdciDeployment | TraefikDeployment | SshDeployment | None = (
         None  # set by steps that deploy a service
     )
 
@@ -352,4 +366,86 @@ class TraefikStep(SetupStep):
             network=TRAEFIK_NETWORK,
             dashboard_url=f"http://{ip}:8080/dashboard/",
             cert_email=self._cert_email,
+        )
+
+
+class AuthorizedKeysStep(SetupStep):
+    """Install the operator's authorized_keys from a GitHub user's public keys."""
+
+    title = "Authorized keys"
+
+    def __init__(
+        self,
+        user: str,
+        github_user: str,
+        paths: SshPaths,
+        github: GitHubKeys | None = None,
+        fs: Fs | None = None,
+    ) -> None:
+        self._user = user
+        self._github_user = github_user
+        self._paths = paths
+        self._github = github or GitHubKeys()
+        self._fs = fs or Fs()
+
+    def is_satisfied(self) -> bool:
+        return self._fs.exists(self._paths.authorized_keys)
+
+    def apply(self) -> None:
+        keys = self._github.fetch(self._github_user)
+        if not keys:
+            raise RuntimeError(
+                f"github user '{self._github_user}' has no public SSH keys; "
+                "refusing to write an empty authorized_keys"
+            )
+        self._fs.make_dir(self._paths.ssh_dir, self._user, SSH_DIR_MODE)
+        self._fs.write_file(
+            self._paths.authorized_keys,
+            render_authorized_keys(self._github_user, keys),
+            self._user,
+            AUTHORIZED_KEYS_MODE,
+        )
+
+
+class SshHardeningStep(SetupStep):
+    """Harden sshd via a drop-in; refuse if it would lock the operator out."""
+
+    title = "SSH hardening"
+
+    def __init__(
+        self,
+        user: str,
+        github_user: str,
+        paths: SshPaths,
+        fs: Fs | None = None,
+    ) -> None:
+        self._user = user
+        self._github_user = github_user
+        self._paths = paths
+        self._fs = fs or Fs()
+
+    def is_satisfied(self) -> bool:
+        if not self._fs.exists(SSHD_DROPIN_PATH):
+            return False
+        return self._fs.read_text(SSHD_DROPIN_PATH) == render_sshd_hardening()
+
+    def apply(self) -> None:
+        if not self._fs.exists(self._paths.authorized_keys):
+            raise RuntimeError(
+                f"refusing to harden SSH: {self._paths.authorized_keys} is "
+                "missing; disabling password auth would lock you out. Ensure "
+                "--github-user names an account with published SSH keys."
+            )
+        self._fs.make_dir(SSHD_DROPIN_DIR, "root", SSHD_DROPIN_DIR_MODE)
+        self._fs.write_file(
+            SSHD_DROPIN_PATH,
+            render_sshd_hardening(),
+            "root",
+            SSHD_DROPIN_FILE_MODE,
+        )
+        self.deployment = SshDeployment(
+            dropin_file=SSHD_DROPIN_PATH,
+            authorized_keys=self._paths.authorized_keys,
+            github_user=self._github_user,
+            reload_hint=SSH_RELOAD_HINT,
         )

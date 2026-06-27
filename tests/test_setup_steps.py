@@ -9,12 +9,14 @@ from fonfon.services.setup_steps import (
     DOCKER_PACKAGES,
     DOCKER_REPO_FILE,
     TAILSCALE_INSTALL_URL,
+    AuthorizedKeysStep,
     DockerGroupStep,
     DockerStep,
     PipxStep,
     SdciConfigStep,
     SdciDirsStep,
     SdciStep,
+    SshHardeningStep,
     TailscaleStep,
     TailscaleUpStep,
     TraefikDirsStep,
@@ -22,6 +24,8 @@ from fonfon.services.setup_steps import (
     TraefikStep,
     UserStep,
 )
+from fonfon.services.ssh_config import SSHD_DROPIN_PATH, render_sshd_hardening
+from fonfon.services.ssh_paths import ssh_paths
 from fonfon.services.traefik_config import TRAEFIK_IMAGE, TRAEFIK_NETWORK
 from fonfon.services.traefik_paths import traefik_paths
 from fonfon.system.dpkg import PackageState
@@ -388,10 +392,11 @@ def test_sdci_config_apply_raises_without_ip():
 
 
 class FakeFs:
-    def __init__(self, existing=()):
-        self._existing = set(existing)
+    def __init__(self, existing=(), contents=None):
+        self._existing = set(existing) | set(contents or {})
         self.made = []
         self.writes = []
+        self.contents = dict(contents or {})
 
     def exists(self, path):
         return path in self._existing
@@ -403,6 +408,10 @@ class FakeFs:
     def write_file(self, path, content, owner, mode):
         self.writes.append((path, content, owner, mode))
         self._existing.add(path)
+        self.contents[path] = content
+
+    def read_text(self, path):
+        return self.contents[path]
 
 
 def test_sdci_dirs_satisfied_when_dirs_exist():
@@ -562,3 +571,102 @@ def test_traefik_apply_raises_without_ip():
     )
     with pytest.raises(RuntimeError):
         step.apply()
+
+
+# ── SSH steps ───────────────────────────────────────────────────────────────────
+
+
+class FakeGitHubKeys:
+    def __init__(self, keys=(), error=None):
+        self._keys = list(keys)
+        self._error = error
+        self.fetched = []
+
+    def fetch(self, username):
+        self.fetched.append(username)
+        if self._error is not None:
+            raise self._error
+        return list(self._keys)
+
+
+SPATHS = ssh_paths("deploy")
+
+
+def test_authorized_keys_satisfied_when_file_exists():
+    fs = FakeFs(existing=(SPATHS.authorized_keys,))
+    step = AuthorizedKeysStep("deploy", "octocat", SPATHS, fs=fs)
+    assert step.is_satisfied() is True
+
+
+def test_authorized_keys_not_satisfied_when_absent():
+    step = AuthorizedKeysStep("deploy", "octocat", SPATHS, fs=FakeFs())
+    assert step.is_satisfied() is False
+
+
+def test_authorized_keys_apply_fetches_and_writes():
+    fs = FakeFs()
+    gh = FakeGitHubKeys(keys=["ssh-ed25519 AAA", "ssh-rsa BBB"])
+    AuthorizedKeysStep("deploy", "octocat", SPATHS, github=gh, fs=fs).apply()
+
+    assert gh.fetched == ["octocat"]
+    # .ssh dir created 0700, owned by the operator
+    assert (SPATHS.ssh_dir, "deploy", "0700") in fs.made
+    # authorized_keys written 0600, owned by the operator, with both keys + header
+    written = {path: (content, owner, mode) for path, content, owner, mode in fs.writes}
+    assert SPATHS.authorized_keys in written
+    content, owner, mode = written[SPATHS.authorized_keys]
+    assert (owner, mode) == ("deploy", "0600")
+    assert "ssh-ed25519 AAA" in content
+    assert "ssh-rsa BBB" in content
+    assert "github.com/octocat" in content
+
+
+def test_authorized_keys_apply_raises_and_writes_nothing_when_no_keys():
+    fs = FakeFs()
+    step = AuthorizedKeysStep(
+        "deploy", "ghost", SPATHS, github=FakeGitHubKeys(keys=[]), fs=fs
+    )
+    with pytest.raises(RuntimeError, match="no public SSH keys"):
+        step.apply()
+    assert fs.writes == []
+
+
+def test_ssh_hardening_not_satisfied_when_dropin_absent():
+    step = SshHardeningStep("deploy", "octocat", SPATHS, fs=FakeFs())
+    assert step.is_satisfied() is False
+
+
+def test_ssh_hardening_satisfied_when_content_matches():
+    fs = FakeFs(contents={SSHD_DROPIN_PATH: render_sshd_hardening()})
+    assert SshHardeningStep("deploy", "octocat", SPATHS, fs=fs).is_satisfied() is True
+
+
+def test_ssh_hardening_not_satisfied_when_content_drifts():
+    fs = FakeFs(contents={SSHD_DROPIN_PATH: "PermitRootLogin yes\n"})
+    assert SshHardeningStep("deploy", "octocat", SPATHS, fs=fs).is_satisfied() is False
+
+
+def test_ssh_hardening_apply_refuses_without_authorized_keys():
+    # lockout guard: no authorized_keys present -> refuse, write nothing
+    fs = FakeFs()
+    step = SshHardeningStep("deploy", "octocat", SPATHS, fs=fs)
+    with pytest.raises(RuntimeError, match="lock you out"):
+        step.apply()
+    assert fs.writes == []
+
+
+def test_ssh_hardening_apply_writes_dropin_and_sets_deployment():
+    fs = FakeFs(existing=(SPATHS.authorized_keys,))
+    step = SshHardeningStep("deploy", "octocat", SPATHS, fs=fs)
+    step.apply()
+
+    written = {path: (content, owner, mode) for path, content, owner, mode in fs.writes}
+    assert SSHD_DROPIN_PATH in written
+    content, owner, mode = written[SSHD_DROPIN_PATH]
+    assert (owner, mode) == ("root", "0644")
+    assert content == render_sshd_hardening()
+    # deployment surfaced for the reload advisory
+    assert step.deployment.dropin_file == SSHD_DROPIN_PATH
+    assert step.deployment.authorized_keys == SPATHS.authorized_keys
+    assert step.deployment.github_user == "octocat"
+    assert "reload" in step.deployment.reload_hint
