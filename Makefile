@@ -12,7 +12,7 @@ NAME := fonfon
 ARCH ?= aarch64
 
 .DEFAULT_GOAL := build
-.PHONY: build clean test test-integration debian-login debian-deploy debian-destroy debian-demo
+.PHONY: build build-linux clean test test-integration debian-login debian-deploy debian-destroy debian-demo
 
 # pydantic-core ships per-platform wheels, so each --scie-platform (which picks the
 # embedded interpreter) is paired with a --platform (which picks the wheel target) so
@@ -26,6 +26,16 @@ build: ## Build self-contained linux + macOS (x86_64 and aarch64) executables in
 		--scie-platform macos-aarch64 --platform macosx_11_0_arm64-cp-314-cp314 -v
 	@rm -f $(DIST)/$(NAME)
 	@echo "Built $(NAME) executables in $(DIST)/: linux-x86_64 linux-aarch64 macos-x86_64 macos-aarch64"
+
+# Linux-only subset of `build`, used by CI to publish server binaries. pex
+# cross-builds both arches from any host, so this needs no aarch64 runner.
+build-linux: ## Build self-contained linux (x86_64 and aarch64) executables into dist/
+	@mkdir -p $(DIST)
+	uv run pex . -c $(NAME) -o $(DIST)/$(NAME) --scie eager \
+		--scie-platform linux-x86_64 --platform manylinux_2_17_x86_64-cp-314-cp314 \
+		--scie-platform linux-aarch64 --platform manylinux_2_17_aarch64-cp-314-cp314 -v
+	@rm -f $(DIST)/$(NAME)
+	@echo "Built $(NAME) executables in $(DIST)/: linux-x86_64 linux-aarch64"
 
 clean: ## Remove the dist/ directory
 	rm -rf $(DIST)

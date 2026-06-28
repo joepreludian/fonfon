@@ -3,6 +3,24 @@
 This page is a placeholder for the base manual. Flesh it out as Fonfon's
 commands take shape.
 
+## Installing
+
+Each push to `main` publishes self-contained Linux executables to
+[GitHub Releases](https://github.com/joepreludian/fonfon/releases) — one per
+architecture, with an embedded Python interpreter, so the target host needs
+nothing else installed. Grab the binary for your server's architecture:
+
+```bash
+# x86_64 (Intel/AMD)
+curl -L https://github.com/joepreludian/fonfon/releases/latest/download/fonfon-linux-x86_64 -o fonfon
+
+# aarch64 (ARM)
+curl -L https://github.com/joepreludian/fonfon/releases/latest/download/fonfon-linux-aarch64 -o fonfon
+
+chmod +x fonfon
+./fonfon --version
+```
+
 ## First run
 
 Once `fonfon` is on the target host, run it with no arguments to get your

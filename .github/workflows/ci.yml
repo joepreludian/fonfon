@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref, but never interrupt a main-branch
+# run mid-publish.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  # Enforce the "bump the version on every change" rule before anything is
+  # built or published: a PR must raise the version above its base branch, and
+  # a push to main must raise it above the previous commit. Fails otherwise.
+  version-check:
+    name: Version bump check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # need history to read pyproject.toml at the baseline
+
+      - name: Resolve baseline commit
+        id: baseline
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "ref=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Ensure pyproject version was bumped
+        run: |
+          baseline="${{ steps.baseline.outputs.ref }}"
+          if [ -z "$baseline" ] || [ "$baseline" = "0000000000000000000000000000000000000000" ]; then
+            echo "No baseline commit to compare against; skipping bump check."
+            exit 0
+          fi
+          python3 tools/check_version_bump.py "$baseline"
+
+  test:
+    name: Lint & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies (locked)
+        run: uv sync --frozen
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Run tests
+        run: uv run pytest
+
+  publish:
+    name: Publish Linux binaries
+    needs: [version-check, test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # create tags/releases via GITHUB_TOKEN
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies (locked)
+        run: uv sync --frozen
+
+      # pex cross-builds both arches from this x86_64 host: each --scie-platform
+      # downloads the matching embedded interpreter and --platform resolves the
+      # matching manylinux wheels (e.g. pydantic-core).
+      - name: Build linux x86_64 + aarch64 executables
+        run: make build-linux
+
+      - name: Create release for the current version (skip if it exists)
+        run: |
+          set -euo pipefail
+          version="$(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")"
+          tag="v${version}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists — nothing to publish."
+            exit 0
+          fi
+          echo "Publishing release $tag"
+          gh release create "$tag" \
+            dist/fonfon-linux-x86_64 \
+            dist/fonfon-linux-aarch64 \
+            --title "$tag" \
+            --generate-notes
