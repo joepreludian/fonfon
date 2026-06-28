@@ -13,34 +13,21 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  # Enforce the "bump the version on every change" rule before anything is
-  # built or published: a PR must raise the version above its base branch, and
-  # a push to main must raise it above the previous commit. Fails otherwise.
+  # On a PR into main, require the version to be raised above the base branch.
+  # (A push straight to main is not gated here — see the publish job, which
+  # simply skips publishing when the version is unchanged, so docs/other
+  # non-code pushes don't need a bump.)
   version-check:
     name: Version bump check
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # need history to read pyproject.toml at the baseline
-
-      - name: Resolve baseline commit
-        id: baseline
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "ref=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "ref=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
-          fi
+          fetch-depth: 0  # need history to read pyproject.toml at the base
 
       - name: Ensure pyproject version was bumped
-        run: |
-          baseline="${{ steps.baseline.outputs.ref }}"
-          if [ -z "$baseline" ] || [ "$baseline" = "0000000000000000000000000000000000000000" ]; then
-            echo "No baseline commit to compare against; skipping bump check."
-            exit 0
-          fi
-          python3 tools/check_version_bump.py "$baseline"
+        run: python3 tools/check_version_bump.py "${{ github.event.pull_request.base.sha }}"
 
   test:
     name: Lint & test
@@ -67,7 +54,7 @@ jobs:
 
   publish:
     name: Publish Linux binaries
-    needs: [version-check, test]
+    needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -76,25 +63,50 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # need the previous commit to detect a version bump
+
+      # Only publish when this push raised the version. Docs/other non-code
+      # pushes leave it unchanged and are skipped here (without failing).
+      - name: Decide whether to publish
+        id: gate
+        run: |
+          baseline="${{ github.event.before }}"
+          if [ -z "$baseline" ] || [ "$baseline" = "0000000000000000000000000000000000000000" ]; then
+            echo "No previous commit to compare against; skipping publish."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            publish="$(python3 tools/check_version_bump.py --gate "$baseline")"
+            echo "version bumped since previous commit: $publish"
+            echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip notice
+        if: steps.gate.outputs.publish != 'true'
+        run: echo "Version unchanged since the previous commit — nothing to publish."
 
       - name: Install uv
+        if: steps.gate.outputs.publish == 'true'
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
 
       - name: Install dependencies (locked)
+        if: steps.gate.outputs.publish == 'true'
         run: uv sync --frozen
 
       # pex cross-builds both arches from this x86_64 host: each --scie-platform
       # downloads the matching embedded interpreter and --platform resolves the
       # matching manylinux wheels (e.g. pydantic-core).
       - name: Build linux x86_64 + aarch64 executables
+        if: steps.gate.outputs.publish == 'true'
         run: make build-linux
 
       - name: Create release for the current version (skip if it exists)
+        if: steps.gate.outputs.publish == 'true'
         run: |
           set -euo pipefail
-          version="$(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")"
+          version="$(python3 tools/check_version_bump.py --current)"
           tag="v${version}"
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "Release $tag already exists — nothing to publish."

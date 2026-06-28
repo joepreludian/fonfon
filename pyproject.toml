@@ -1,6 +1,6 @@
 [project]
 name = "fonfon"
-version = "0.10.1"
+version = "0.10.2"
 description = "Opinionated VPS server configurator"
 readme = "README.md"
 authors = [
