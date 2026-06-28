@@ -133,7 +133,7 @@ wheels = [
 
 [[package]]
 name = "fonfon"
-version = "0.10.2"
+version = "0.10.3"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
