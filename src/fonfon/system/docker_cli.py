@@ -11,9 +11,28 @@ class DockerCli:
     def __init__(self, run: Callable = _default_run):
         self._run = run
 
-    def is_available(self) -> bool:
+    def cli_present(self) -> bool:
+        """True if the docker client is installed (no daemon contact)."""
+        return self._run(["docker", "--version"]).returncode == 0
+
+    def socket_status(self) -> str:
+        """Report reachability of the docker daemon over its socket.
+
+        Asking for `.Server.Version` forces a round-trip to the daemon through
+        `/var/run/docker.sock` — the very socket Traefik mounts to discover
+        containers. Returns one of:
+
+        - ``"ready"``  — the daemon answered.
+        - ``"denied"`` — the socket exists but the current user can't read it
+          (needs sudo or membership of the ``docker`` group).
+        - ``"down"``   — the daemon is unreachable (not running / no socket).
+        """
         proc = self._run(["docker", "version", "--format", "{{.Server.Version}}"])
-        return proc.returncode == 0
+        if proc.returncode == 0:
+            return "ready"
+        if "permission denied" in (proc.stderr or "").lower():
+            return "denied"
+        return "down"
 
     def inspect_container(self, name: str) -> dict[str, Any] | None:
         proc = self._run(["docker", "inspect", name])

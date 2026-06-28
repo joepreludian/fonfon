@@ -9,8 +9,11 @@ from fonfon.system.docker_cli import DockerCli
 
 class DockerReport(BaseModel):
     docker_installed: bool
+    socket_ready: bool = False
+    socket_reason: str | None = None
     service: str | None = None
     present: bool = False
+    running: bool = False
     host: str | None = None
     listening: dict[int, bool] = Field(default_factory=dict)
     network_name: str | None = None
@@ -39,10 +42,29 @@ class DockerService:
         dashboard_port: int | None = None,
         tailnet_ip: str | None = None,
     ) -> DockerReport:
-        if not self._docker.is_available():
+        if not self._docker.cli_present():
             return DockerReport(
                 docker_installed=False,
+                socket_ready=False,
                 service=self._service,
+                host=host,
+                listening={p: False for p in ports},
+                network_name=network,
+                dashboard_port=dashboard_port,
+                tailnet_ip=tailnet_ip,
+            )
+        status = self._docker.socket_status()
+        if status != "ready":
+            # socket not reachable (daemon down, or permission denied): nothing
+            # else can be inspected, so report the reason and leave the rest at
+            # their "not found" defaults.
+            return DockerReport(
+                docker_installed=True,
+                socket_ready=False,
+                socket_reason=status,
+                service=self._service,
+                present=False,
+                running=False,
                 host=host,
                 listening={p: False for p in ports},
                 network_name=network,
@@ -54,8 +76,10 @@ class DockerService:
         if inspect is None:
             return DockerReport(
                 docker_installed=True,
+                socket_ready=True,
                 service=self._service,
                 present=False,
+                running=False,
                 host=host,
                 listening={p: False for p in ports},
                 network_name=network,
@@ -63,6 +87,7 @@ class DockerService:
                 dashboard_port=dashboard_port,
                 tailnet_ip=tailnet_ip,
             )
+        running = bool(inspect.get("State", {}).get("Running"))
         net = inspect.get("NetworkSettings", {})
         published = net.get("Ports") or {}
         listening = {
@@ -85,8 +110,10 @@ class DockerService:
             )
         return DockerReport(
             docker_installed=True,
+            socket_ready=True,
             service=self._service,
             present=True,
+            running=running,
             host=host,
             listening=listening,
             network_name=network,

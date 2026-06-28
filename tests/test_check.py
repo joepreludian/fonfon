@@ -34,6 +34,8 @@ def _base(**over):
         ),
         docker=DockerReport(docker_installed=False),
         sdci_installed=False,
+        is_root=False,
+        can_sudo=True,
     )
     args.update(over)
     return build_report(**args)
@@ -63,21 +65,97 @@ def test_network_items_are_info():
 
 def test_docker_absent_section_is_skip():
     dock = _items(_base(), "Docker")
-    assert all(i.status is CheckStatus.SKIP for i in dock.values())
+    # the sudo item is still reported even when docker itself is absent
+    assert dock["docker"].status is CheckStatus.SKIP
+    assert "sudo" in dock
 
 
 def test_docker_gaps_are_warn():
     report = _base(
         docker=DockerReport(
             docker_installed=True,
+            socket_ready=True,
             service="traefik",
             present=False,
+            running=False,
             listening={80: False, 443: False},
             network_present=False,
         )
     )
     dock = _items(report, "Docker")
-    assert all(i.status is CheckStatus.WARN for i in dock.values())
+    assert dock["socket"].status is CheckStatus.OK
+    gaps = [i for label, i in dock.items() if label not in ("socket", "sudo")]
+    assert all(i.status is CheckStatus.WARN for i in gaps)
+
+
+def test_docker_socket_not_ready_is_fail():
+    report = _base(
+        docker=DockerReport(
+            docker_installed=True,
+            socket_ready=False,
+            service="traefik",
+            present=False,
+            running=False,
+            listening={80: False, 443: False},
+            network_present=False,
+        )
+    )
+    item = _items(report, "Docker")["socket"]
+    assert item.status is CheckStatus.FAIL
+    assert "dockerd" in item.detail
+    # an unreachable socket fails the gate
+    assert report.ok is False
+
+
+def test_docker_socket_denied_explains_permission():
+    report = _base(
+        docker=DockerReport(
+            docker_installed=True,
+            socket_ready=False,
+            socket_reason="denied",
+            service="traefik",
+        )
+    )
+    item = _items(report, "Docker")["socket"]
+    assert item.status is CheckStatus.FAIL
+    assert "permission denied" in item.detail
+    assert report.ok is False
+
+
+def test_docker_sudo_available_is_ok():
+    item = _items(_base(can_sudo=True, is_root=False), "Docker")["sudo"]
+    assert item.status is CheckStatus.OK
+    assert item.detail == "available"
+
+
+def test_docker_sudo_root_is_ok():
+    item = _items(_base(is_root=True), "Docker")["sudo"]
+    assert item.status is CheckStatus.OK
+    assert item.detail == "running as root"
+
+
+def test_docker_sudo_unavailable_is_warn():
+    item = _items(_base(can_sudo=False, is_root=False), "Docker")["sudo"]
+    assert item.status is CheckStatus.WARN
+    assert "sudo" in item.detail
+
+
+def test_docker_present_but_stopped_is_warn():
+    report = _base(
+        docker=DockerReport(
+            docker_installed=True,
+            socket_ready=True,
+            service="traefik",
+            present=True,
+            running=False,
+            listening={80: False, 443: False},
+            network_present=True,
+            network_name="traefik",
+        )
+    )
+    item = _items(report, "Docker")["traefik"]
+    assert item.status is CheckStatus.WARN
+    assert item.detail == "present but stopped"
 
 
 def test_unsupported_distro_packages_section_has_skip_row():
@@ -113,8 +191,10 @@ def test_service_enabled_but_inactive_detail():
 def test_docker_all_ok_path():
     docker = DockerReport(
         docker_installed=True,
+        socket_ready=True,
         service="traefik",
         present=True,
+        running=True,
         listening={80: True, 443: True},
         network_present=True,
         network_name="traefik",
@@ -129,8 +209,10 @@ def test_docker_all_ok_path():
 def test_docker_dashboard_public_is_fail():
     docker = DockerReport(
         docker_installed=True,
+        socket_ready=True,
         service="traefik",
         present=True,
+        running=True,
         listening={80: True, 443: True},
         network_present=True,
         network_name="traefik",
@@ -146,8 +228,10 @@ def test_docker_dashboard_public_is_fail():
 def test_docker_dashboard_tailnet_only_is_ok_with_ip_detail():
     docker = DockerReport(
         docker_installed=True,
+        socket_ready=True,
         service="traefik",
         present=True,
+        running=True,
         listening={80: True, 443: True},
         network_present=True,
         network_name="traefik",

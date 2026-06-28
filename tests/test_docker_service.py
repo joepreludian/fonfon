@@ -4,12 +4,24 @@ from fonfon.services.docker_service import DockerService
 
 
 class FakeDocker:
-    def __init__(self, available=True, inspect=None, networks=()):
-        self._available, self._inspect = available, inspect
+    def __init__(self, available=True, socket=None, inspect=None, networks=()):
+        self._available = available
+        # socket status follows CLI presence unless overridden; a bool is
+        # accepted as shorthand for "ready"/"down".
+        if socket is None:
+            self._socket = "ready" if available else "down"
+        elif isinstance(socket, bool):
+            self._socket = "ready" if socket else "down"
+        else:
+            self._socket = socket
+        self._inspect = inspect
         self._networks = set(networks)
 
-    def is_available(self):
+    def cli_present(self):
         return self._available
+
+    def socket_status(self):
+        return self._socket
 
     def inspect_container(self, name):
         return self._inspect
@@ -31,6 +43,7 @@ def test_docker_absent_marks_not_installed():
 def test_traefik_listening():
     inspect = {
         "Name": "/traefik",
+        "State": {"Running": True},
         "NetworkSettings": {
             "Ports": {
                 "80/tcp": [{"HostIp": "0.0.0.0", "HostPort": "80"}],
@@ -45,8 +58,48 @@ def test_traefik_listening():
         .ensure_listening(host="0.0.0.0", ports=[80, 443])
     )
     assert report.docker_installed is True
+    assert report.socket_ready is True
     assert report.present is True
+    assert report.running is True
     assert report.listening == {80: True, 443: True}
+
+
+def test_socket_not_ready_short_circuits():
+    """CLI installed but daemon down: socket_ready False, nothing inspected."""
+    report = (
+        DockerService(docker=FakeDocker(available=True, socket=False))
+        .for_service("traefik")
+        .ensure_listening(host="0.0.0.0", ports=[80, 443], network="traefik")
+    )
+    assert report.docker_installed is True
+    assert report.socket_ready is False
+    assert report.socket_reason == "down"
+    assert report.present is False
+    assert report.running is False
+    assert report.network_present is False
+    assert report.listening == {80: False, 443: False}
+
+
+def test_socket_permission_denied_is_reported():
+    report = (
+        DockerService(docker=FakeDocker(available=True, socket="denied"))
+        .for_service("traefik")
+        .ensure_listening(host="0.0.0.0", ports=[80])
+    )
+    assert report.docker_installed is True
+    assert report.socket_ready is False
+    assert report.socket_reason == "denied"
+
+
+def test_present_but_stopped_is_not_running():
+    inspect = {"State": {"Running": False}, "NetworkSettings": {"Ports": {}}}
+    report = (
+        DockerService(docker=FakeDocker(inspect=inspect))
+        .for_service("traefik")
+        .ensure_listening(host="0.0.0.0", ports=[80])
+    )
+    assert report.present is True
+    assert report.running is False
 
 
 def test_traefik_absent_when_inspect_none():

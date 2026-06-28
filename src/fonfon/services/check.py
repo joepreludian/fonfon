@@ -12,6 +12,7 @@ from fonfon.services.package_service import PackageReport, PackageService
 from fonfon.services.systemd_service import ServicesReport, SystemdService
 from fonfon.services.traefik_config import TRAEFIK_NETWORK
 from fonfon.system.pipx import Pipx
+from fonfon.system.sudo import Sudo
 
 PACKAGES = ["sudo", "docker-ce", "tailscale", "pipx"]
 SERVICES = ["docker", "ssh", "tailscaled", "sdci"]
@@ -44,8 +45,16 @@ def run_check() -> CheckReport:
     except UnsupportedDistroError:
         packages = None
     sdci_installed = Pipx().has_executable("sdci-server")
+    sudo = Sudo()
     return build_report(
-        os_info, packages, services, network, docker, sdci_installed=sdci_installed
+        os_info,
+        packages,
+        services,
+        network,
+        docker,
+        sdci_installed=sdci_installed,
+        is_root=sudo.is_root(),
+        can_sudo=sudo.can_sudo(),
     )
 
 
@@ -57,6 +66,8 @@ def build_report(
     docker: DockerReport,
     *,
     sdci_installed: bool = False,
+    is_root: bool = False,
+    can_sudo: bool = False,
 ) -> CheckReport:
     return CheckReport(
         sections=[
@@ -64,7 +75,7 @@ def build_report(
             _packages_section(os_info, packages, sdci_installed),
             _services_section(services),
             _network_section(network),
-            _docker_section(docker),
+            _docker_section(docker, is_root=is_root, can_sudo=can_sudo),
         ]
     )
 
@@ -159,25 +170,36 @@ def _network_section(network: NetworkInfo) -> CheckSection:
     return CheckSection(title="Network", items=items)
 
 
-def _docker_section(docker: DockerReport) -> CheckSection:
+def _docker_section(
+    docker: DockerReport, *, is_root: bool = False, can_sudo: bool = False
+) -> CheckSection:
+    sudo = _sudo_item(is_root=is_root, can_sudo=can_sudo)
     if not docker.docker_installed:
         return CheckSection(
             title="Docker",
             items=[
+                sudo,
                 CheckItem(
                     key="docker.skip",
                     label="docker",
                     status=CheckStatus.SKIP,
                     detail="docker not installed",
-                )
+                ),
             ],
         )
+    socket = _socket_item(docker)
     name = docker.service or "service"
+    if docker.running:
+        traefik_status, traefik_detail = CheckStatus.OK, "running"
+    elif docker.present:
+        traefik_status, traefik_detail = CheckStatus.WARN, "present but stopped"
+    else:
+        traefik_status, traefik_detail = CheckStatus.WARN, "container not running"
     present = CheckItem(
         key="docker.traefik",
         label=name,
-        status=CheckStatus.OK if docker.present else CheckStatus.WARN,
-        detail="running" if docker.present else "container not running",
+        status=traefik_status,
+        detail=traefik_detail,
     )
     net_name = docker.network_name or "external"
     network = CheckItem(
@@ -198,13 +220,37 @@ def _docker_section(docker: DockerReport) -> CheckSection:
         detail="listening" if listening_ok else "not listening",
     )
     return CheckSection(
-        title="Docker", items=[present, network, ports, _dashboard_item(docker)]
+        title="Docker",
+        items=[sudo, socket, present, network, ports, _dashboard_item(docker)],
     )
+
+
+def _sudo_item(*, is_root: bool, can_sudo: bool) -> CheckItem:
+    if is_root:
+        status, detail = CheckStatus.OK, "running as root"
+    elif can_sudo:
+        status, detail = CheckStatus.OK, "available"
+    else:
+        status, detail = CheckStatus.WARN, "unavailable (sudo or docker group needed)"
+    return CheckItem(key="docker.sudo", label="sudo", status=status, detail=detail)
+
+
+def _socket_item(docker: DockerReport) -> CheckItem:
+    if docker.socket_ready:
+        status, detail = CheckStatus.OK, "ready"
+    elif docker.socket_reason == "denied":
+        status, detail = (
+            CheckStatus.FAIL,
+            "permission denied — run with sudo or join the 'docker' group",
+        )
+    else:
+        status, detail = CheckStatus.FAIL, "unreachable (is dockerd running?)"
+    return CheckItem(key="docker.socket", label="socket", status=status, detail=detail)
 
 
 def _dashboard_item(docker: DockerReport) -> CheckItem:
     port = docker.dashboard_port
-    if not docker.present:
+    if not docker.running:
         status, detail = CheckStatus.WARN, "container not running"
     elif docker.dashboard_public:
         status, detail = CheckStatus.FAIL, f"exposed publicly (0.0.0.0:{port})"

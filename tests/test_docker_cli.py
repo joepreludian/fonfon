@@ -4,9 +4,34 @@ from fonfon.system.docker_cli import DockerCli
 from tests.fakes import completed
 
 
-def test_is_available_true_on_zero_exit():
+def test_cli_present_true_on_zero_exit():
+    docker = DockerCli(run=lambda args, timeout=10: completed(args, 0, "Docker 27.3"))
+    assert docker.cli_present() is True
+
+
+def test_cli_present_false_when_binary_absent():
+    docker = DockerCli(
+        run=lambda args, timeout=10: completed(args, 127, "", "not found")
+    )
+    assert docker.cli_present() is False
+
+
+def test_socket_status_ready_on_zero_exit():
     docker = DockerCli(run=lambda args, timeout=10: completed(args, 0, "27.3.1"))
-    assert docker.is_available() is True
+    assert docker.socket_status() == "ready"
+
+
+def test_socket_status_down_when_daemon_unreachable():
+    docker = DockerCli(
+        run=lambda args, timeout=10: completed(args, 1, "", "Cannot connect to daemon")
+    )
+    assert docker.socket_status() == "down"
+
+
+def test_socket_status_denied_on_permission_error():
+    stderr = "permission denied while trying to connect to the Docker daemon socket"
+    docker = DockerCli(run=lambda args, timeout=10: completed(args, 1, "", stderr))
+    assert docker.socket_status() == "denied"
 
 
 def test_inspect_container_returns_none_when_absent():
